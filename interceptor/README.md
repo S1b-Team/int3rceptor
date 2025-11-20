@@ -36,8 +36,8 @@
 -   **🚀 Blazing Fast**: Rust-powered async I/O handles thousands of concurrent connections
 -   **🎨 Modern UI**: Beautiful Vue 3 interface with real-time updates via WebSocket
 -   **🔧 Powerful Features**: Rule engine, intruder, scope management, regex matchers, WebSocket interception
--   **💰 100% Free**: No licensing fees, no feature restrictions
--   **🔓 Open Source**: Fully auditable, community-driven development
+-   **🔍 Source Available**: Code is visible for transparency and security auditing
+-   **💼 Commercial Licensing**: Flexible licensing options for businesses
 
 ---
 
