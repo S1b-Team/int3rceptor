@@ -1,0 +1,18 @@
+[package]
+name = "interceptor"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "interceptor"
+path = "src/main.rs"
+
+[dependencies]
+interceptor-core = { path = "../core" }
+interceptor-api = { path = "../api" }
+tokio.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+axum.workspace = true

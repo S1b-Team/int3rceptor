@@ -1,0 +1,463 @@
+You are Codex CLI. Generate a complete monorepo named interceptor for an open-source “Interceptor - HTTP/S Proxy” (Burp-like). Use Rust for backend, Vue 3 + TypeScript for the web UI. Implement a Cargo workspace with core (library), api (server), and cli (binary). Include tasks, docs, tests, Docker, and CI. All code, comments, docs, and identifiers must be in English.
+
+High-level goals
+
+    Transparent HTTP/HTTPS intercepting proxy with on-the-fly TLS MITM
+    Real-time request/response capture, search, and export
+    REST API + WebSocket streaming for UI
+    Lightweight Vue 3 dashboard for history, editor, and repeater
+    Cross-platform, fast, safe
+
+Tech stack
+
+    Rust 1.74+ (edition 2021), Tokio async runtime
+    Hyper 1.x, Rustls 0.22, tokio-rustls 0.25, rcgen 0.12
+    Axum 0.7, tower, tower-http, tokio-tungstenite
+    SQLite later (Phase 2), in-memory capture first
+    Vue 3 + TypeScript + Vite, Axios
+    tracing + tracing-subscriber for logs
+
+Repository layout interceptor/ ├── Cargo.toml # Workspace ├── rust-toolchain.toml ├── README.md ├── LICENSE ├── .gitignore ├── .editorconfig ├── Makefile ├── docker-compose.yml ├── .github/ │ └── workflows/ci.yml ├── core/ │ ├── Cargo.toml │ └── src/ │ ├── lib.rs │ ├── error.rs │ ├── proxy.rs │ ├── tls.rs │ ├── cert_manager.rs │ ├── connection_pool.rs │ └── capture.rs ├── api/ │ ├── Cargo.toml │ └── src/ │ ├── main.rs │ ├── routes.rs │ ├── websocket.rs │ ├── models.rs │ └── state.rs ├── cli/ │ ├── Cargo.toml │ └── src/ │ └── main.rs ├── core/tests/ │ └── https_example.rs └── ui/ ├── package.json ├── tsconfig.json ├── vite.config.ts ├── index.html └── src/ ├── main.ts ├── App.vue ├── types/index.ts ├── composables/useApi.ts ├── composables/useWebSocket.ts └── components/ ├── RequestList.vue ├── RequestDetail.vue └── RepeaterTab.vue
+
+Top-level files
+
+Cargo.toml (workspace) [workspace] members = ["core", "api", "cli"] resolver = "2"
+
+[workspace.package] edition = "2021"
+
+[workspace.dependencies] tokio = { version = "1.35", features = ["full"] } hyper = { version = "1.0", features = ["full"] } http-body-util = "0.1" hyper-util = { version = "0.1", features = ["client", "http1", "http2"] } rustls = "0.22" tokio-rustls = "0.25" rcgen = "0.12" axum = "0.7" tower = "0.4" tower-http = { version = "0.5", features = ["cors", "fs", "trace"] } tokio-tungstenite = "0.21" serde = { version = "1.0", features = ["derive"] } serde_json = "1.0" thiserror = "1.0" anyhow = "1.0" bytes = "1.5" parking_lot = "0.12" dashmap = "5.5" tracing = "0.1" tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] } clap = { version = "4.4", features = ["derive"] } time = { version = "0.3", features = ["macros"] } base64 = "0.22"
+
+rust-toolchain.toml [toolchain] channel = "stable"
+
+LICENSE MIT License (fill standard MIT text with copyright: 2025 Interceptor Contributors)
+
+.gitignore /target /.idea /.vscode .DS_Store node_modules ui/dist .env *.log
+
+.editorconfig root = true [*] charset = utf-8 end_of_line = lf insert_final_newline = true indent_style = space indent_size = 4 trim_trailing_whitespace = true
+
+Makefile .PHONY: dev backend ui build test lint fmt docker dev: ; cargo run -p cli -- --listen 127.0.0.1:8080 --api 127.0.0.1:3000 backend: ; cargo run -p api ui: ; cd ui && npm install && npm run dev build: ; cargo build --release test: ; cargo test --all lint: ; cargo clippy --all-targets -- -D warnings fmt: ; cargo fmt --all docker: ; docker compose up --build
+
+docker-compose.yml services: api: build: context: . dockerfile: Dockerfile.api ports: ["3000:3000", "8080:8080"] volumes: ["./ca:/root/.interceptor/ca"] ui: build: context: ./ui dockerfile: Dockerfile ports: ["5173:5173"] depends_on: ["api"]
+
+.github/workflows/ci.yml name: CI on: [push, pull_request] jobs: build: runs-on: ubuntu-latest steps: - uses: actions/checkout@v4 - uses: dtolnay/rust-toolchain@stable - run: cargo build --workspace --all-targets - run: cargo test --workspace --all-targets
+
+Core crate
+
+core/Cargo.toml [package] name = "interceptor-core" version = "0.1.0" edition = "2021"
+
+[dependencies] tokio.workspace = true hyper.workspace = true http-body-util.workspace = true hyper-util.workspace = true rustls.workspace = true tokio-rustls.workspace = true rcgen.workspace = true anyhow.workspace = true thiserror.workspace = true bytes.workspace = true parking_lot.workspace = true dashmap.workspace = true tracing.workspace = true time.workspace = true base64.workspace = true serde.workspace = true serde_json.workspace = true
+
+src/lib.rs pub mod error; pub mod proxy; pub mod tls; pub mod cert_manager; pub mod connection_pool; pub mod capture;
+
+src/error.rs use thiserror::Error;
+
+#[derive(Debug, Error)] pub enum ProxyError { #[error("IO error: {0}")] Io(#[from] std::io::Error), #[error("HTTP error: {0}")] Http(#[from] hyper::Error), #[error("TLS error: {0}")] Tls(String), #[error("Invalid request: {0}")] InvalidRequest(String), #[error("Connection failed: {0}")] ConnectionFailed(String), #[error("Other: {0}")] Other(String), }
+
+src/connection_pool.rs use std::time::Duration;
+
+#[derive(Clone, Debug)] pub struct ConnectionPoolConfig { pub idle_timeout: Duration, pub max_idle_per_host: usize, }
+
+impl Default for ConnectionPoolConfig { fn default() -> Self { Self { idle_timeout: Duration::from_secs(30), max_idle_per_host: 8, } } }
+
+src/capture.rs use parking_lot::RwLock; use serde::{Deserialize, Serialize}; use std::sync::{ atomic::{AtomicU64, Ordering}, Arc, };
+
+#[derive(Debug, Clone, Serialize, Deserialize)] pub struct CapturedRequest { pub id: u64, pub timestamp_ms: i64, pub method: String, pub url: String, pub headers: Vec<(String, String)>, pub body: Vec, pub tls: bool, }
+
+#[derive(Debug, Clone, Serialize, Deserialize)] pub struct CapturedResponse { pub request_id: u64, pub status_code: u16, pub headers: Vec<(String, String)>, pub body: Vec, pub duration_ms: u64, }
+
+#[derive(Clone)] pub struct RequestCapture { requests: Arc<RwLock<Vec>>, responses: Arc<RwLock<Vec>>, next_id: Arc, max_entries: usize, }
+
+impl RequestCapture { pub fn new(max_entries: usize) -> Self { Self { requests: Arc::new(RwLock::new(Vec::new())), responses: Arc::new(RwLock::new(Vec::new())), next_id: Arc::new(AtomicU64::new(1)), max_entries, } }
+
+pub fn capture_request(&self, mut req: CapturedRequest) -> u64 {
+    let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+    req.id = id;
+    let mut r = self.requests.write();
+    r.push(req);
+    self.evict_if_needed(&mut r);
+    id
+}
+
+pub fn capture_response(&self, resp: CapturedResponse) {
+    let mut r = self.responses.write();
+    r.push(resp);
+    self.evict_pair_if_needed();
+}
+
+pub fn get_all(&self) -> Vec<(CapturedRequest, Option<CapturedResponse>)> {
+    let r = self.requests.read().clone();
+    let res = self.responses.read().clone();
+    r.into_iter()
+        .map(|req| {
+            let resp = res.iter().rev().find(|x| x.request_id == req.id).cloned();
+            (req, resp)
+        })
+        .collect()
+}
+
+pub fn clear(&self) {
+    self.requests.write().clear();
+    self.responses.write().clear();
+    self.next_id.store(1, Ordering::SeqCst);
+}
+
+fn evict_if_needed(&self, reqs: &mut Vec<CapturedRequest>) {
+    if reqs.len() > self.max_entries {
+        let over = reqs.len() - self.max_entries;
+        reqs.drain(0..over);
+    }
+}
+
+fn evict_pair_if_needed(&self) {
+    let mut reqs = self.requests.write();
+    if reqs.len() > self.max_entries {
+        let over = reqs.len() - self.max_entries;
+        reqs.drain(0..over);
+    }
+}
+
+}
+
+src/cert_manager.rs use anyhow::Result; use dashmap::DashMap; use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, KeyUsagePurpose, IsCa, BasicConstraints}; use rustls::pki_types::{CertificateDer, PrivateKeyDer}; use std::{fs, path::PathBuf, sync::Arc, time::Duration}; use time::OffsetDateTime;
+
+pub struct CertManager { ca_cert: Certificate, cert_cache: Arc<DashMap<String, (CertificateDer<'static>, PrivateKeyDer<'static>)>>, ca_dir: PathBuf, }
+
+impl CertManager { pub fn new() -> Result { let ca_dir = dirs::home_dir() .unwrap_or_else(|| PathBuf::from(".")) .join(".interceptor/ca"); fs::create_dir_all(&ca_dir)?; let ca_pem = ca_dir.join("root_ca.pem"); let ca_key = ca_dir.join("root_ca_key.pem");
+
+let ca_cert = if ca_pem.exists() && ca_key.exists() {
+        // Load existing
+        let params = Self::load_ca_params(&ca_pem, &ca_key)?;
+        Certificate::from_params(params)?
+    } else {
+        // Create new
+        let params = Self::generate_ca_params()?;
+        let cert = Certificate::from_params(params.clone())?;
+        fs::write(&ca_pem, cert.serialize_pem()?)?;
+        fs::write(&ca_key, cert.serialize_private_key_pem())?;
+        cert
+    };
+
+    Ok(Self {
+        ca_cert,
+        cert_cache: Arc::new(DashMap::new()),
+        ca_dir,
+    })
+}
+
+fn generate_ca_params() -> Result<CertificateParams> {
+    let mut params = CertificateParams::new(vec![]);
+    params
+        .distinguished_name
+        .push(DnType::CommonName, "Interceptor Proxy CA");
+    params
+        .distinguished_name
+        .push(DnType::OrganizationName, "Interceptor");
+    params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+    params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
+    params.not_before = OffsetDateTime::now_utc() - Duration::from_secs(60);
+    params.not_after = OffsetDateTime::now_utc() + Duration::from_secs(60 * 60 * 24 * 365 * 10);
+    Ok(params)
+}
+
+fn load_ca_params(ca_pem: &PathBuf, key_pem: &PathBuf) -> Result<CertificateParams> {
+    let cert_pem = fs::read_to_string(ca_pem)?;
+    let key_pem = fs::read_to_string(key_pem)?;
+    let mut params = CertificateParams::from_ca_cert_pem(&cert_pem, &key_pem)?;
+    params
+        .distinguished_name
+        .push(DnType::CommonName, "Interceptor Proxy CA");
+    Ok(params)
+}
+
+pub fn generate_cert(&self, domain: &str) -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
+    if let Some(v) = self.cert_cache.get(domain) {
+        return Ok(v.clone());
+    }
+    let mut params = CertificateParams::new(vec![domain.to_string()]);
+    params.distinguished_name.push(DnType::CommonName, domain);
+    let cert = Certificate::from_params(params)?;
+    let key = cert.serialize_private_key_der();
+    let der = cert.serialize_der_with_signer(&self.ca_cert)?;
+    let out = (CertificateDer::from(der), PrivateKeyDer::from(key));
+    self.cert_cache.insert(domain.to_string(), out.clone());
+    Ok(out)
+}
+
+pub fn export_ca_cert(&self, path: &std::path::Path) -> Result<()> {
+    std::fs::write(path, self.ca_cert.serialize_pem()?)?;
+    Ok(())
+}
+
+}
+
+src/tls.rs use crate::{cert_manager::CertManager, error::ProxyError}; use rustls::server::{ClientHello, ResolvesServerCert}; use rustls::sign::CertifiedKey; use std::{sync::Arc}; use tokio_rustls::TlsAcceptor;
+
+pub struct DynamicCertResolver { pub cert_manager: Arc, }
+
+impl ResolvesServerCert for DynamicCertResolver { fn resolve(&self, ch: ClientHello) -> Option<Arc> { let sni = ch.server_name()?.to_string(); let (cert, key) = self.cert_manager.generate_cert(&sni).ok()?; let signing_key = rustls::sign::any_supported_type(&key).ok()?; let ck = CertifiedKey::new(vec![cert], signing_key); Some(Arc::new(ck)) } }
+
+pub struct TlsInterceptor { pub cert_manager: Arc, pub acceptor: TlsAcceptor, }
+
+impl TlsInterceptor { pub fn new(cert_manager: Arc) -> Self { let resolver = Arc::new(DynamicCertResolver { cert_manager: cert_manager.clone() }); let mut cfg = rustls::ServerConfig::builder() .with_safe_defaults() .with_client_cert_verifier(rustls::server::NoClientAuth::new()) .with_cert_resolver(resolver); cfg.alpn_protocols = vec![b"http/1.1".to_vec(), b"h2".to_vec()]; let acceptor = TlsAcceptor::from(Arc::new(cfg)); Self { cert_manager, acceptor } } }
+
+src/proxy.rs use crate::{capture::RequestCapture, error::ProxyError}; use hyper::{Request, Response, Body, Uri, Method}; use hyper::http::StatusCode; use tokio::io::{copy_bidirectional}; use tokio::net::TcpStream; use std::net::SocketAddr; use tracing::{info, warn};
+
+pub struct ProxyServer { pub addr: SocketAddr, pub capture: RequestCapture, }
+
+impl ProxyServer { pub fn new(addr: SocketAddr, capture: RequestCapture) -> Self { Self { addr, capture } }
+
+pub async fn run(self) -> Result<(), ProxyError> {
+    // Placeholder: implement Hyper server with CONNECT and forward handling
+    info!("Starting proxy on {}", self.addr);
+    Ok(())
+}
+
+async fn handle_connect(&self, _host: &str, mut a: TcpStream, mut b: TcpStream) -> Result<(), ProxyError> {
+    let _ = copy_bidirectional(&mut a, &mut b).await?;
+    Ok(())
+}
+
+async fn forward_request(&self, _req: Request<Body>) -> Result<Response<Body>, ProxyError> {
+    Ok(Response::builder().status(StatusCode::OK).body(Body::from("OK")).unwrap())
+    // Later: forward to target, capture, return upstream response
+}
+
+}
+
+API crate
+
+api/Cargo.toml [package] name = "interceptor-api" version = "0.1.0" edition = "2021"
+
+[dependencies] interceptor-core = { path = "../core" } tokio.workspace = true axum.workspace = true tower.workspace = true tower-http.workspace = true serde.workspace = true serde_json.workspace = true tokio-tungstenite.workspace = true tracing.workspace = true anyhow.workspace = true
+
+src/state.rs use interceptor_core::capture::RequestCapture; use interceptor_core::cert_manager::CertManager; use std::sync::Arc;
+
+#[derive(Clone)] pub struct AppState { pub capture: Arc, pub cert_manager: Arc, }
+
+src/models.rs use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)] pub struct RepeatRequest { pub id: u64, pub modified_body: Option, }
+
+src/routes.rs use crate::state::AppState; use axum::{ extract::{Path, State}, http::StatusCode, response::{IntoResponse, Json}, routing::{delete, get, post}, Router, }; use serde_json::json;
+
+pub fn router(state: AppState) -> Router { Router::new() .route("/api/requests", get(list_requests).delete(clear_requests)) .route("/api/requests/:id", get(get_request)) .route("/api/requests/:id/repeat", post(repeat_request)) .route("/api/ca-cert", get(download_ca_cert)) .with_state(state) }
+
+async fn list_requests(State(state): State) -> impl IntoResponse { let items = state.capture.get_all(); Json(items) }
+
+async fn get_request(Path(_id): Path, State(state): State) -> impl IntoResponse { // Minimal placeholder until capture wiring is complete Json(json!({ "ok": true })) }
+
+async fn repeat_request(Path(_id): Path) -> impl IntoResponse { (StatusCode::NOT_IMPLEMENTED, "Repeater not implemented yet") }
+
+async fn clear_requests(State(state): State) -> impl IntoResponse { state.capture.clear(); StatusCode::NO_CONTENT }
+
+async fn download_ca_cert(State(state): State) -> impl IntoResponse { // In Phase 2: stream CA cert file (StatusCode::OK, "CA export TODO") }
+
+src/websocket.rs use axum::{extract::{State, WebSocketUpgrade}, response::IntoResponse}; use axum::extract::ws::{Message, WebSocket}; use futures::sink::SinkExt; use serde_json::json;
+
+use crate::state::AppState;
+
+pub async fn ws_route(ws: WebSocketUpgrade, State(_state): State) -> impl IntoResponse { ws.on_upgrade(handle_socket) }
+
+async fn handle_socket(mut socket: WebSocket) { let _ = socket.send(Message::Text(json!({"type":"hello","data":"connected"}).to_string())).await; }
+
+src/main.rs mod routes; mod websocket; mod state; mod models;
+
+use axum::{routing::get, Router}; use routes::router as api_router; use state::AppState; use std::{net::SocketAddr, sync::Arc}; use tower_http::cors::CorsLayer; use tracing::info;
+
+#[tokio::main] async fn main() -> anyhow::Result<()> { tracing_subscriber::fmt().with_env_filter("info").init();
+
+let capture = Arc::new(interceptor_core::capture::RequestCapture::new(10_000));
+let cert_manager = Arc::new(interceptor_core::cert_manager::CertManager::new()?);
+
+let state = AppState { capture, cert_manager };
+let app = api_router(state.clone())
+    .route("/ws", get(websocket::ws_route))
+    .layer(CorsLayer::permissive());
+
+let addr: SocketAddr = "127.0.0.1:3000".parse()?;
+info!("API listening on http://{addr}");
+axum::Server::bind(&addr).serve(app.into_make_service()).await?;
+Ok(())
+
+}
+
+CLI crate
+
+cli/Cargo.toml [package] name = "interceptor" version = "0.1.0" edition = "2021"
+
+[[bin]] name = "interceptor" path = "src/main.rs"
+
+[dependencies] interceptor-core = { path = "../core" } interceptor-api = { path = "../api" } tokio.workspace = true clap.workspace = true tracing.workspace = true tracing-subscriber.workspace = true anyhow.workspace = true
+
+src/main.rs use clap::Parser; use std::{net::SocketAddr, path::PathBuf, sync::Arc}; use tracing::info;
+
+#[derive(Parser, Debug)] #[command(name = "interceptor")] #[command(about = "HTTP/HTTPS intercepting proxy")] struct Cli { #[arg(short, long, default_value = "127.0.0.1:8080")] listen: String, #[arg(short, long, default_value = "127.0.0.1:3000")] api: String, #[arg(long)] export_ca: Option, #[arg(short, long, default_value = "info")] verbosity: String, }
+
+#[tokio::main] async fn main() -> anyhow::Result<()> { tracing_subscriber::fmt() .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into())) .init();
+
+let cli = Cli::parse();
+
+// Prepare shared state
+let capture = Arc::new(interceptor_core::capture::RequestCapture::new(10_000));
+let cert_manager = Arc::new(interceptor_core::cert_manager::CertManager::new()?);
+
+if let Some(path) = cli.export_ca {
+    cert_manager.export_ca_cert(&path)?;
+    println!("CA certificate exported to {}", path.display());
+    return Ok(());
+}
+
+// Spawn API server
+let api_addr: SocketAddr = cli.api.parse()?;
+let api_task = tokio::spawn(async move {
+    use interceptor_api::state::AppState;
+    use interceptor_api::routes;
+    use interceptor_api::websocket;
+    use axum::{routing::get, Router};
+    use tower_http::cors::CorsLayer;
+
+    let state = AppState { capture: capture.clone(), cert_manager: cert_manager.clone() };
+    let app = routes::router(state.clone())
+        .route("/ws", get(websocket::ws_route))
+        .layer(CorsLayer::permissive());
+
+    tracing::info!("API listening on http://{api_addr}");
+    axum::Server::bind(&api_addr).serve(app.into_make_service()).await
+});
+
+// Start proxy (placeholder)
+let listen_addr: SocketAddr = cli.listen.parse()?;
+let proxy_task = tokio::spawn(async move {
+    let proxy = interceptor_core::proxy::ProxyServer::new(listen_addr, (*capture).clone());
+    info!("Proxy listening on {}", listen_addr);
+    proxy.run().await
+});
+
+let _ = tokio::try_join!(api_task, proxy_task)?;
+Ok(())
+
+}
+
+Core integration test
+
+core/tests/https_example.rs #[tokio::test] async fn placeholder_https_example() { // In Phase 2: spin up proxy and test CONNECT to example.com assert!(true); }
+
+UI app
+
+ui/package.json { "name": "interceptor-ui", "private": true, "version": "0.0.1", "type": "module", "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview --port 5173" }, "dependencies": { "axios": "^1.6.7", "vue": "^3.4.0" }, "devDependencies": { "@vitejs/plugin-vue": "^5.0.0", "typescript": "^5.4.0", "vite": "^5.0.0" } }
+
+ui/tsconfig.json { "compilerOptions": { "target": "ES2020", "module": "ESNext", "moduleResolution": "Bundler", "strict": true, "jsx": "preserve", "baseUrl": ".", "paths": { "@/": ["./src/"] }, "types": ["vite/client"] } }
+
+ui/vite.config.ts import { defineConfig } from 'vite' import vue from '@vitejs/plugin-vue'
+
+export default defineConfig({ plugins: [vue()], server: { port: 5173 } })
+
+ui/index.html
+
+ui/src/main.ts import { createApp } from 'vue' import App from './App.vue'
+
+createApp(App).mount('#app')
+
+ui/src/App.vue
+
+ui/src/types/index.ts export interface CapturedRequest { id: number timestamp_ms: number method: string url: string headers: [string, string][] body: number[] tls: boolean } export interface CapturedResponse { request_id: number status_code: number headers: [string, string][] body: number[] duration_ms: number }
+
+ui/src/composables/useApi.ts import axios from 'axios' export const api = axios.create({ baseURL: 'http://127.0.0.1:3000' })
+
+ui/src/composables/useWebSocket.ts import { ref, onUnmounted } from 'vue' export function useWebSocket(url: string) { const requests = ref<any[]>([]) const connected = ref(false) const ws = new WebSocket(url) ws.onopen = () => { connected.value = true } ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'request') requests.value.unshift(m.data) } catch {} } onUnmounted(() => ws.close()) return { requests, connected } }
+
+ui/src/components/RequestList.vue
+
+ui/src/components/RequestDetail.vue
+
+ui/src/components/RepeaterTab.vue
+
+README.md
+Interceptor - HTTP/S Proxy
+
+Open-source HTTP/HTTPS intercepting proxy (Burp-like) with real-time capture and a Vue-based dashboard.
+
+    Core: Rust (Tokio, Hyper, Rustls)
+    API: Axum + WebSocket
+    UI: Vue 3 + TypeScript + Vite
+
+Quickstart
+
+    Backend API: cargo run -p api
+    Full stack: make dev (CLI spawns API and proxy)
+    UI dev: make ui
+
+Export CA: interceptor --export-ca ./interceptor-ca.pem
+
+Install the CA into your OS/browser trust store for HTTPS interception.
+Project layout
+
+(monorepo tree as above)
+Roadmap
+
+    Phase 1: Basic proxy (HTTP, CONNECT), in-memory capture
+    Phase 2: TLS MITM, repeater, filters, export
+    Phase 3: Storage (SQLite), search, rules engine
+
+TASKS.md (top-level)
+Tasks for Interceptor
+
+Phase 1 — Core Proxy Engine
+
+    Setup Rust workspace and crates compile
+    Implement HTTP proxy (Hyper 1.x) without TLS:
+        Listen on configurable address
+        Handle CONNECT tunneling (tcp copy_bidirectional)
+        Forward regular HTTP requests
+        Capture method, URL, headers, body
+    In-memory capture store with eviction
+    CLI to start proxy and API concurrently
+    Basic API endpoints: list, get, clear
+    WebSocket “request” events
+
+Phase 2 — TLS MITM and Editor
+
+    Certificate Authority manager (rcgen, cache, export)
+    Dynamic certificate via SNI (Rustls ResolvesServerCert)
+    MITM TLS traffic, capture request/response pairs
+    Repeater endpoint and UI tab
+
+Phase 3 — Persistence and Search
+
+    SQLite storage with indexing
+    Filter/search by method, host, status, extension
+    Export HAR/JSON/CSV
+
+Phase 4 — Polish
+
+    Docker images and compose
+    CI: build/test on PR
+    Docs for CA installation per OS
+
+Dockerfiles Create Dockerfile.api at repo root:
+syntax=docker/dockerfile:1
+
+FROM rust:1 as build WORKDIR /app COPY . . RUN cargo build --release -p api FROM debian:bookworm-slim RUN useradd -m runner WORKDIR /home/runner COPY --from=build /app/target/release/interceptor-api /usr/local/bin/interceptor-api EXPOSE 3000 8080 USER runner CMD ["interceptor-api"]
+
+Create ui/Dockerfile: FROM node:20-alpine WORKDIR /app COPY . . RUN npm ci EXPOSE 5173 CMD ["npm","run","dev","--","--host","0.0.0.0"]
+
+Acceptance criteria
+
+    cargo build and cargo test succeed
+    interceptor binary runs, starts API and placeholder proxy
+    GET http://127.0.0.1:3000/api/requests returns JSON array
+    WebSocket ws://127.0.0.1:3000/ws connects
+    UI dev server loads and shows empty list
+    CA export writes a valid PEM file
+
+Implementation notes
+
+    Keep all code, comments, docs in English
+    Prefer tracing over println
+    Keep core proxy logic decoupled from API/UI
+    Add TODO markers for MITM and forwarding details
+    Follow the provided module boundaries
+
+Generate all files with the exact content above. Ensure the workspace builds. Where code is placeholder, include TODOs to implement in next steps.
+
+--- END PROMPT ---

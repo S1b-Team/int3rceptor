@@ -1,0 +1,196 @@
+use crate::capture::{CaptureEntry, CaptureQuery, CapturedRequest, CapturedResponse};
+use crate::error::Result;
+use rusqlite::{params, Connection, OpenFlags, ToSql};
+use serde_json;
+use std::cmp::min;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+#[derive(Debug)]
+pub struct CaptureStorage {
+    path: PathBuf,
+}
+
+impl CaptureStorage {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let storage = Self { path };
+        storage.init()?;
+        Ok(storage)
+    }
+
+    fn connect(&self) -> Result<Connection> {
+        let conn = Connection::open_with_flags(
+            &self.path,
+            OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_READ_WRITE,
+        )?;
+        conn.busy_timeout(Duration::from_secs(1))?;
+        Ok(conn)
+    }
+
+    fn init(&self) -> Result<()> {
+        let conn = self.connect()?;
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS captures (
+                id INTEGER PRIMARY KEY,
+                timestamp_ms INTEGER NOT NULL,
+                method TEXT NOT NULL,
+                url TEXT NOT NULL,
+                headers TEXT NOT NULL,
+                body BLOB,
+                tls INTEGER NOT NULL,
+                resp_status INTEGER,
+                resp_headers TEXT,
+                resp_body BLOB,
+                duration_ms INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_captures_method ON captures(method);
+            CREATE INDEX IF NOT EXISTS idx_captures_url ON captures(url);
+            CREATE INDEX IF NOT EXISTS idx_captures_status ON captures(resp_status);
+            "#,
+        )?;
+        Ok(())
+    }
+
+    pub fn insert(&self, entry: &CaptureEntry) -> Result<()> {
+        let conn = self.connect()?;
+        let body = if entry.request.body.is_empty() {
+            None
+        } else {
+            Some(entry.request.body.as_slice())
+        };
+        let resp_body = entry.response.as_ref().and_then(|r| {
+            if r.body.is_empty() {
+                None
+            } else {
+                Some(r.body.as_slice())
+            }
+        });
+        let resp_headers = entry
+            .response
+            .as_ref()
+            .map(|r| serde_json::to_string(&r.headers))
+            .transpose()?;
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO captures (
+                id,
+                timestamp_ms,
+                method,
+                url,
+                headers,
+                body,
+                tls,
+                resp_status,
+                resp_headers,
+                resp_body,
+                duration_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "#,
+            params![
+                entry.request.id as i64,
+                clamp_i128(entry.request.timestamp_ms),
+                entry.request.method,
+                entry.request.url,
+                serde_json::to_string(&entry.request.headers)?,
+                body,
+                if entry.request.tls { 1 } else { 0 },
+                entry.response.as_ref().map(|r| r.status_code as i64),
+                resp_headers,
+                resp_body,
+                entry.response.as_ref().map(|r| clamp_u128(r.duration_ms)),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn clear(&self) -> Result<()> {
+        let conn = self.connect()?;
+        conn.execute("DELETE FROM captures", [])?;
+        Ok(())
+    }
+
+    pub fn query(&self, filter: &CaptureQuery) -> Result<Vec<CaptureEntry>> {
+        let mut sql = String::from(
+            "SELECT id, timestamp_ms, method, url, headers, body, tls, resp_status, resp_headers, resp_body, duration_ms FROM captures WHERE 1=1",
+        );
+        let mut values: Vec<String> = Vec::new();
+
+        if let Some(method) = &filter.method {
+            sql.push_str(" AND method = ?");
+            values.push(method.clone());
+        }
+        if let Some(host) = &filter.host {
+            sql.push_str(" AND url LIKE ?");
+            values.push(format!("%{}%", host));
+        }
+        if let Some(status) = filter.status {
+            sql.push_str(" AND resp_status = ?");
+            values.push(status.to_string());
+        }
+        if let Some(tls) = filter.tls {
+            sql.push_str(" AND tls = ?");
+            values.push(if tls { "1" } else { "0" }.into());
+        }
+        if let Some(search) = &filter.search {
+            sql.push_str(" AND (url LIKE ? OR headers LIKE ?)");
+            let pattern = format!("%{}%", search);
+            values.push(pattern.clone());
+            values.push(pattern);
+        }
+        sql.push_str(" ORDER BY id DESC");
+        let limit = filter.limit.unwrap_or(500);
+        sql.push_str(&format!(" LIMIT {}", limit));
+
+        let conn = self.connect()?;
+        let mut stmt = conn.prepare(&sql)?;
+        let param_refs: Vec<&dyn ToSql> = values.iter().map(|v| v as &dyn ToSql).collect();
+        let mut rows = stmt.query(&param_refs[..])?;
+        let mut entries = Vec::new();
+        while let Some(row) = rows.next()? {
+            let request = CapturedRequest {
+                id: row.get::<_, i64>(0)? as u64,
+                timestamp_ms: row.get::<_, i64>(1)? as i128,
+                method: row.get(2)?,
+                url: row.get(3)?,
+                headers: serde_json::from_str::<Vec<(String, String)>>(&row.get::<_, String>(4)?)?,
+                body: row.get::<_, Option<Vec<u8>>>(5)?.unwrap_or_default(),
+                tls: row.get::<_, i64>(6)? == 1,
+            };
+            let response = match row.get::<_, Option<i64>>(7)? {
+                Some(status) => {
+                    let header_json: Option<String> = row.get(8)?;
+                    let headers = header_json
+                        .map(|h| {
+                            serde_json::from_str::<Vec<(String, String)>>(&h).unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                    let body = row.get::<_, Option<Vec<u8>>>(9)?.unwrap_or_default();
+                    let duration_ms = row.get::<_, Option<i64>>(10)?.unwrap_or(0) as u128;
+                    Some(CapturedResponse {
+                        request_id: request.id,
+                        status_code: status as u16,
+                        headers,
+                        body,
+                        duration_ms,
+                    })
+                }
+                None => None,
+            };
+            entries.push(CaptureEntry { request, response });
+        }
+        Ok(entries)
+    }
+}
+
+fn clamp_i128(value: i128) -> i64 {
+    value.clamp(i64::MIN as i128, i64::MAX as i128) as i64
+}
+
+fn clamp_u128(value: u128) -> i64 {
+    min(value, i64::MAX as u128) as i64
+}

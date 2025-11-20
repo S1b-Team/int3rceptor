@@ -1,0 +1,100 @@
+name: CI
+
+on:
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main, develop]
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    test-backend:
+        name: Test Backend (Rust)
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Install Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  profile: minimal
+                  toolchain: stable
+                  override: true
+                  components: rustfmt, clippy
+
+            - name: Cache cargo registry
+              uses: actions/cache@v3
+              with:
+                  path: ~/.cargo/registry
+                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+            - name: Cache cargo index
+              uses: actions/cache@v3
+              with:
+                  path: ~/.cargo/git
+                  key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+            - name: Cache cargo build
+              uses: actions/cache@v3
+              with:
+                  path: target
+                  key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+            - name: Check formatting
+              run: cargo fmt -- --check
+
+            - name: Run clippy
+              run: cargo clippy --all-targets --all-features -- -D warnings
+
+            - name: Run tests
+              run: cargo test --verbose
+
+            - name: Build
+              run: cargo build --release --verbose
+
+    test-frontend:
+        name: Test Frontend (Vue)
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v3
+              with:
+                  node-version: "18"
+                  cache: "npm"
+                  cache-dependency-path: ui/package-lock.json
+
+            - name: Install dependencies
+              working-directory: ./ui
+              run: npm ci
+
+            - name: Type check
+              working-directory: ./ui
+              run: npm run type-check
+
+            - name: Build
+              working-directory: ./ui
+              run: npm run build
+
+    security-audit:
+        name: Security Audit
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Install Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  profile: minimal
+                  toolchain: stable
+                  override: true
+
+            - name: Run cargo audit
+              run: cargo install cargo-audit && cargo audit
+              continue-on-error: true
