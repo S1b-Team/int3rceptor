@@ -1,20 +1,16 @@
 <div align="center">
 
-# 🎯 Interceptor
+![int3rceptor Banner](assets/project_banner.png)
 
-### Professional HTTP/HTTPS Intercepting Proxy
-
-[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Vue](https://img.shields.io/badge/vue-3.4%2B-green.svg)](https://vuejs.org/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Commercial License](https://img.shields.io/badge/Commercial-Available-blue.svg)](LICENSE_COMMERCIAL.md)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg?style=for-the-badge)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Vue](https://img.shields.io/badge/vue-3.4%2B-green.svg?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](CONTRIBUTING.md)
+[![Commercial License](https://img.shields.io/badge/Commercial-Available-blue.svg?style=for-the-badge)](LICENSE_COMMERCIAL.md)
 
 **A modern, high-performance security testing platform built with Rust and Vue.js**
 
 [Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing) • [Commercial License](#-commercial-licensing)
-
-![Interceptor Dashboard](https://via.placeholder.com/800x400/0f172a/38bdf8?text=Interceptor+Dashboard)
 
 </div>
 
