@@ -234,7 +234,6 @@ For full installation details, see the [Development Guide](interceptor/docs/DEVE
 
 ---
 
-<div align="center">
 ## 🏗️ Architecture
 
 int3rceptor/
@@ -254,8 +253,6 @@ int3rceptor/
 │ └── store/ # Pinia state
 └── cli/ # Command-line interface
 └── main.rs
-
-</div>
 
 **Tech Stack:**
 
