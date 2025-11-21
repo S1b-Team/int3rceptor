@@ -90,9 +90,18 @@ For full installation details, see the [Development Guide](interceptor/docs/DEVE
 
 ### Technical Docs
 
-- **[Architecture](interceptor/docs/ARCHITECTURE.md)**
 - **[API Reference](interceptor/docs/API.md)**
 - **[Configuration](interceptor/docs/CONFIG.md)**
+
+---
+
+## 🏗️ Architecture
+
+<div align="center">
+
+![Architecture Diagram](interceptor/assets/architecture.png)
+
+</div>
 
 ---
 
@@ -106,7 +115,7 @@ For full installation details, see the [Development Guide](interceptor/docs/DEVE
 | **Startup**    | $499/year   | 10 users, 5 servers, Email support       |
 | **Enterprise** | $2,499/year | Unlimited, Priority support, Source mods |
 
-📧 **Contact**: s1bgr0up.root@gmail.com  
+📧 **Contact**: s1bgr0uP.root@gmail.com  
 📄 **Details**: [LICENSE_COMMERCIAL.md](interceptor/LICENSE_COMMERCIAL.md)
 
 ---
