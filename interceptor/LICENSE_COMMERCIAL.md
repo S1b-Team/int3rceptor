@@ -16,18 +16,17 @@ This Commercial License Agreement ("Agreement") grants specific rights to use In
 
 ## License Tiers
 
-### 🏢 **Enterprise License** - $2,499/year
+### 🏢 **Enterprise License** - Custom Pricing
 
 **Includes**:
 
 -   ✅ Unlimited commercial use
 -   ✅ Deploy on unlimited servers
 -   ✅ Modify source code for internal use
--   ✅ Priority email support (48h response)
--   ✅ Security updates and patches
--   ✅ Quarterly feature updates
+-   ✅ Priority email support (24h response)
+-   ✅ SSO / SAML Integration
+-   ✅ Dedicated Account Manager
 -   ❌ No redistribution rights
--   ❌ No reselling rights
 
 ### 🚀 **Startup License** - $499/year
 
@@ -36,12 +35,21 @@ This Commercial License Agreement ("Agreement") grants specific rights to use In
 -   ✅ Commercial use (up to 10 users)
 -   ✅ Deploy on up to 5 servers
 -   ✅ Modify source code for internal use
--   ✅ Email support (72h response)
+-   ✅ Email support (48h response)
 -   ✅ Security updates
 -   ❌ No redistribution rights
--   ❌ No reselling rights
 
-### 👤 **Individual License** - $99/year
+### 💎 **Lifetime License** - $249 (One-time payment)
+
+**Includes**:
+
+-   ✅ **Commercial use forever** (single user)
+-   ✅ **All future major versions** (v3, v4, etc.)
+-   ✅ **Early access** to beta features
+-   ✅ Special "Early Adopter" badge on profile
+-   ✅ Priority support queue
+
+### 👤 **Individual License** - $59/year
 
 **Includes**:
 
@@ -51,7 +59,6 @@ This Commercial License Agreement ("Agreement") grants specific rights to use In
 -   ✅ Community support
 -   ✅ Security updates
 -   ❌ No modification rights
--   ❌ No redistribution rights
 
 ---
 
