@@ -419,22 +419,31 @@ npm run dev
 
 ### Commercial License Tiers
 
-#### 🏢 **Enterprise License** - $2,499/year
+#### 🏢 **Enterprise License** - Custom Pricing
 
 -   Unlimited commercial use
 -   Deploy on unlimited servers
 -   Modify source code for internal use
--   Priority support (48h response)
--   Security updates and quarterly features
+-   Priority support (24h response)
+-   SSO / SAML Integration
+-   Dedicated Account Manager
 
 #### 🚀 **Startup License** - $499/year
 
 -   Commercial use (up to 10 users)
 -   Deploy on up to 5 servers
--   Email support (72h response)
+-   Email support (48h response)
 -   Security updates
 
-#### 👤 **Individual License** - $99/year
+#### � **Lifetime License** - $249 (One-time payment)
+
+-   **Commercial use forever** (single user)
+-   **All future major versions** (v3, v4, etc.)
+-   **Early access** to beta features
+-   Special "Early Adopter" badge on profile
+-   Priority support queue
+
+#### �👤 **Individual License** - $59/year
 
 -   Commercial use (single user)
 -   Deploy on up to 2 servers
