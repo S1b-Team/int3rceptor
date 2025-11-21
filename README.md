@@ -90,7 +90,6 @@ For full installation details, see the [Development Guide](interceptor/docs/DEVE
 
 ### Technical Docs
 
-- **[Architecture](interceptor/docs/ARCHITECTURE.md)**
 - **[API Reference](interceptor/docs/API.md)**
 - **[Configuration](interceptor/docs/CONFIG.md)**
 
