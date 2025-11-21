@@ -237,23 +237,25 @@ For full installation details, see the [Development Guide](interceptor/docs/DEVE
 <div align="center">
 ## 🏗️ Architecture
 
+```
 int3rceptor/
-├── core/ # Proxy engine & Logic (Rust + Tokio)
-│ ├── proxy.rs # Main proxy logic
-│ ├── tls.rs # TLS 1.2/1.3 interception
-│ ├── intruder.rs # Fuzzer engine
-│ ├── rules.rs # Traffic modification
-│ ├── scope.rs # Scope management
-│ └── storage.rs # SQLite persistence
-├── api/ # Web server (Axum)
-│ ├── routes.rs # REST API endpoints
-│ └── websocket.rs # Real-time updates
-├── ui/ # Vue.js 3 frontend
-│ ├── components/ # Reusable UI
-│ ├── views/ # Page layouts
-│ └── store/ # Pinia state
-└── cli/ # Command-line interface
-└── main.rs
+├── core/              # Proxy engine & Logic (Rust + Tokio)
+│   ├── proxy.rs       # Main proxy logic
+│   ├── tls.rs         # TLS 1.2/1.3 interception
+│   ├── intruder.rs    # Fuzzer engine
+│   ├── rules.rs       # Traffic modification
+│   ├── scope.rs       # Scope management
+│   └── storage.rs     # SQLite persistence
+├── api/               # Web server (Axum)
+│   ├── routes.rs      # REST API endpoints
+│   └── websocket.rs   # Real-time updates
+├── ui/                # Vue.js 3 frontend
+│   ├── components/    # Reusable UI
+│   ├── views/         # Page layouts
+│   └── store/         # Pinia state
+└── cli/               # Command-line interface
+    └── main.rs
+```
 
 </div>
 
