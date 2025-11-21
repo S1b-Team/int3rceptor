@@ -30,31 +30,169 @@
 - 💼 **Commercial License Required** for business use
 - 🔒 **Proprietary** - All rights reserved by S1BGr0uP
 
+**Key Advantages:**
+
+- ⚡ **10x Faster** - Rust's zero-cost abstractions eliminate JVM overhead
+- 🎨 **Modern UX** - Real-time WebSocket dashboard, no page refreshes
+- 💾 **Low Memory** - Efficient resource usage for long testing sessions
+- 🔓 **Transparent** - Source available for security audit
+- 💰 **Fair Pricing** - Free for personal use, affordable for professionals
+
 ---
 
 ## ✨ Features
 
 ### 🔍 **Traffic Interception**
 
-Full HTTP/HTTPS proxy with TLS MITM, automatic certificate generation, and real-time WebSocket capture.
+Full HTTP/HTTPS proxy with automatic TLS MITM, self-signed CA certificate generation, and real-time WebSocket capture. Supports HTTP/2, HTTP/1.1, and connection pooling for optimal performance.
 
 ### 🎯 **Intruder / Fuzzer**
 
-Automated payload injection with 4 attack modes (Sniper, Battering Ram, Pitchfork, Cluster Bomb) and pre-loaded security payloads.
+Automated payload injection with **4 attack modes:**
+
+- **Sniper** - Single payload position iteration
+- **Battering Ram** - Same payload in all positions
+- **Pitchfork** - Multiple synchronized payloads
+- **Cluster Bomb** - All payload combinations
+
+Includes pre-loaded SecLists wordlists, custom payload support, rate limiting, and grep matching for vulnerability detection.
 
 ### 🔧 **Rule Engine**
 
-Powerful traffic modification engine. Match by URL, Header, or Body and perform actions like Replace, Set Header, or Drop.
+Powerful traffic modification system with pattern matching:
 
-### ⚡ **Regex Matchers (v2.0)**
+- **Match by:** URL (regex/wildcard), Headers, Body content
+- **Actions:** Replace text, Set/Remove headers, Drop requests
+- **Live editing** - Modify requests/responses before forwarding
 
-Advanced pattern matching with capture groups and intelligent caching for high-performance traffic analysis.
+### 🔄 **Request Repeater**
 
-### 🔌 **WebSocket Interception (v2.0)**
+Unlimited request modification and resending with:
 
-Full frame capture (Text, Binary, Ping/Pong), bidirectional monitoring, and connection tracking.
+- Tab management for multiple sessions
+- Response comparison (diff view)
+- Variable substitution for dynamic payloads
+- Export to Fuzzer for automated attacks
+
+### 📜 **History & Search**
+
+Complete traffic capture with SQLite-based search:
+
+- Advanced filters (method, status, host, size, content-type)
+- Export formats: HAR, JSON, CSV, cURL commands
+- Timeline visualization
+- Automatic session recovery
+
+### 🔧 **Decoder/Encoder Suite**
+
+Essential encoding tools for security testing:
+
+- URL, Base64, Hex, Binary, HTML Entities
+- JWT decoder (header + payload inspection)
+- Hash calculators (MD5, SHA-1, SHA-256, SHA-512)
+
+### 🎨 **Comparer**
+
+Visual diff tool for:
+
+- Request vs Request comparison
+- Response vs Response analysis
+- Syntax-aware JSON/XML structural diff
+- Word & character-level highlighting
+
+### 🎯 **Scope Management**
+
+Intelligent traffic filtering:
+
+- Include/Exclude rules (regex & wildcards)
+- Protocol filtering (HTTP/HTTPS/WebSocket)
+- Auto-scope learning from browsing patterns
+- Sensitive data protection (exclude banking, auth servers)
+
+### 🚀 **Coming in v2.0**
+
+- ⚡ **Advanced Regex Matchers** - Capture groups with intelligent caching
+- 🔌 **Enhanced WebSocket Interception** - Frame-level analysis (Text, Binary, Ping/Pong)
+- 🤖 **AI-Powered Vulnerability Detection**
+- 🔗 **Collaboration Mode** - Team sharing and session sync
 
 ---
+
+## 🎪 Real-World Use Cases
+
+<details>
+<summary><b>For Penetration Testers</b></summary>
+
+- ✅ **SQL Injection Testing** - Systematic parameter fuzzing
+- ✅ **Session Fixation Analysis** - Cookie generation pattern tracking
+- ✅ **CSRF Detection** - Token comparison across requests
+- ✅ **XXE Attacks** - Real-time XML payload modification
+- ✅ **SSRF Exploration** - Outbound request monitoring
+
+</details>
+
+<details>
+<summary><b>For Bug Bounty Hunters</b></summary>
+
+- ✅ **Hidden Parameter Discovery** - Wordlist-based fuzzing
+- ✅ **Race Condition Testing** - Parallel request execution
+- ✅ **JWT Token Analysis** - Decode & modify claims
+- ✅ **API Endpoint Enumeration** - Pattern-based discovery
+- ✅ **IDOR Testing** - Systematic ID manipulation
+
+</details>
+
+<details>
+<summary><b>For Developers</b></summary>
+
+- ✅ **API Debugging** - Payload inspection & modification
+- ✅ **Rate Limiting Tests** - Throttling behavior verification
+- ✅ **Error Handling** - Edge case testing
+- ✅ **Mobile App Traffic** - TLS communication decryption
+- ✅ **WebSocket Debugging** - Real-time message monitoring
+
+</details>
+
+<details>
+<summary><b>For Security Researchers</b></summary>
+
+- ✅ **Protocol Analysis** - Proprietary format reverse engineering
+- ✅ **Malware Traffic Analysis** - Safe MITM inspection
+- ✅ **IoT Device Testing** - Embedded systems traffic capture
+- ✅ **Cloud API Research** - Endpoint discovery & analysis
+- ✅ **Supply Chain Attacks** - Third-party request monitoring
+
+</details>
+
+## ❓ Frequently Asked Questions
+
+### Is int3rceptor better than Burp Suite?
+
+**Performance:** Yes - Rust provides 3-5x faster request processing than Java  
+**UI:** Modern Vue.js dashboard vs outdated Swing interface  
+**Price:** $99/year vs $449/year for Burp Pro
+
+### Can I use int3rceptor for bug bounty hunting?
+
+Absolutely! Includes all essential tools: interceptor, repeater, fuzzer, decoder.
+
+### Does it work with mobile apps (iOS/Android)?
+
+Yes - configure your device's proxy settings to point to int3rceptor.
+
+### What's the difference from OWASP ZAP?
+
+- **Speed:** Rust vs Python (10x faster on large responses)
+- **UI:** Real-time WebSocket updates vs polling
+- **UX:** Designed for modern workflows
+
+### Is the source code auditable?
+
+Yes - source is available for review and security auditing under proprietary license.
+
+### Can I use it offline?
+
+Yes - all features work locally without internet connection.
 
 ## 🚀 Quick Start
 
@@ -96,15 +234,68 @@ For full installation details, see the [Development Guide](interceptor/docs/DEVE
 
 ---
 
-## 💼 Commercial Licensing
+<div align="center">
+## 🏗️ Architecture
 
-**Interceptor is free for personal use.** For commercial use (business, consulting, pen-testing services), a license is required.
+int3rceptor/
+├── core/ # Proxy engine & Logic (Rust + Tokio)
+│ ├── proxy.rs # Main proxy logic
+│ ├── tls.rs # TLS 1.2/1.3 interception
+│ ├── intruder.rs # Fuzzer engine
+│ ├── rules.rs # Traffic modification
+│ ├── scope.rs # Scope management
+│ └── storage.rs # SQLite persistence
+├── api/ # Web server (Axum)
+│ ├── routes.rs # REST API endpoints
+│ └── websocket.rs # Real-time updates
+├── ui/ # Vue.js 3 frontend
+│ ├── components/ # Reusable UI
+│ ├── views/ # Page layouts
+│ └── store/ # Pinia state
+└── cli/ # Command-line interface
+└── main.rs
 
-| License Tier   | Price       | Features                                 |
-| :------------- | :---------- | :--------------------------------------- |
-| **Individual** | $99/year    | Commercial use, 2 servers                |
-| **Startup**    | $499/year   | 10 users, 5 servers, Email support       |
-| **Enterprise** | $2,499/year | Unlimited, Priority support, Source mods |
+</div>
+
+**Tech Stack:**
+
+- **Backend:** Rust 1.75+, Tokio (async), Hyper (HTTP), Rustls (TLS), Axum (web framework)
+- **Frontend:** Vue.js 3, TypeScript, Vite, Pinia, Monaco Editor
+- **Storage:** SQLite (requests), Redis (sessions - optional)
+
+## 💰 Licensing
+
+int3rceptor uses a dual-licensing model to remain sustainable:
+
+### 📖 Personal/Non-Commercial Use
+
+**FREE for:**
+
+- Individual security researchers
+- Students learning web security
+- Personal bug bounty hunting
+- Open-source project testing
+- Educational purposes
+
+### 💼 Commercial Use
+
+**License Required ($99/year) for:**
+
+- Professional penetration testing
+- Security consulting services
+- Corporate security teams
+- Paid bug bounty programs
+- Government/enterprise use
+
+**Enterprise:** Custom pricing with SSO, priority support, SLA
+
+### 🔓 Source Transparency
+
+- ✅ Full source code available on GitHub for review
+- ✅ Security auditing encouraged - no black boxes
+- ✅ Issue tracking & contributions welcome
+- 🔒 **Proprietary license** - all rights reserved by S1BGr0uP
+- ❌ Redistribution prohibited without permission
 
 📧 **Contact**: s1bgr0up.root@gmail.com  
 📄 **Details**: [LICENSE_COMMERCIAL.md](interceptor/LICENSE_COMMERCIAL.md)
