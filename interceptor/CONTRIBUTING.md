@@ -1,4 +1,10 @@
+<div align="center">
+
+![Interceptor Banner](interceptor/assets/banner.png)
+
 # Contributing to Interceptor
+
+</div>
 
 Thank you for your interest in contributing to Interceptor! This document outlines the process and guidelines for contributing to this **proprietary** project.
 
@@ -331,6 +337,7 @@ pub async fn fetchData(url: &str) -> Data {
 interface User {
     id: number;
     name: string;
+    email: string;
 }
 
 const fetchUser = async (id: number): Promise<User> => {
@@ -439,5 +446,5 @@ Your contributions help make Interceptor better for everyone!
 
 ---
 
-**Last Updated**: 2025-11-20  
-**Version**: 2.0
+**Last Updated**: 2025-11-21
+**Version**: 2.0.1
