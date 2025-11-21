@@ -99,11 +99,12 @@ For full installation details, see the [Development Guide](interceptor/docs/DEVE
 
 **Interceptor is free for personal use.** For commercial use (business, consulting, pen-testing services), a license is required.
 
-| License Tier   | Price       | Features                                 |
-| :------------- | :---------- | :--------------------------------------- |
-| **Individual** | $99/year    | Commercial use, 2 servers                |
-| **Startup**    | $499/year   | 10 users, 5 servers, Email support       |
-| **Enterprise** | $2,499/year | Unlimited, Priority support, Source mods |
+| License Tier   | Price               | Features                                    |
+| :------------- | :------------------ | :------------------------------------------ |
+| **Individual** | **$59/year**        | Commercial use, 2 servers                   |
+| **Lifetime**   | **$249** (One-time) | **Forever updates**, Priority support badge |
+| **Startup**    | $499/year           | 10 users, 5 servers, Email support          |
+| **Enterprise** | Custom              | Unlimited, SSO, SLA, Source mods            |
 
 ## 🏗️ Architecture
 
