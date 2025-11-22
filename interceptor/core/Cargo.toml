@@ -25,3 +25,4 @@ serde.workspace = true
 serde_json.workspace = true
 rusqlite.workspace = true
 regex = "1.10"
+obfstr = "0.4"

@@ -1,14 +1,34 @@
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║                          INT3RCEPTOR v2.0.0                               ║
+// ║                   Copyright (c) 2025 S1BGr0uP                             ║
+// ║                        All Rights Reserved                                ║
+// ╠═══════════════════════════════════════════════════════════════════════════╣
+// ║  PROPRIETARY SOFTWARE - Unauthorized copying, modification, distribution, ║
+// ║  or use of this software is strictly prohibited without explicit written  ║
+// ║  permission from S1BGr0uP. See LICENSE file for full terms.               ║
+// ║                                                                           ║
+// ║  Build Fingerprint: {BUILD_ID}                                            ║
+// ║  License: https://github.com/S1b-Team/int3rceptor/blob/main/LICENSE      ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+
 use clap::Parser;
 use interceptor_core::connection_pool::ConnectionPool;
 use interceptor_core::proxy::ProxyServer;
 use interceptor_core::tls::TlsInterceptor;
 use interceptor_core::{
-    capture::RequestCapture, cert_manager::CertManager, rules::RuleEngine, storage::CaptureStorage, Intruder, ScopeManager, WsCapture,
+    capture::RequestCapture, cert_manager::CertManager, rules::RuleEngine, storage::CaptureStorage,
+    Intruder, ScopeManager, WsCapture,
 };
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::info;
+
+// Build-time watermark - DO NOT REMOVE
+const BUILD_FINGERPRINT: &str = env!("BUILD_FINGERPRINT");
+const COPYRIGHT_NOTICE: &str =
+    "Int3rceptor v2.0.0 - Copyright (c) 2025 S1BGr0uP. All Rights Reserved.";
+const LICENSE_URL: &str = "https://github.com/S1b-Team/int3rceptor/blob/main/LICENSE";
 
 #[derive(Parser, Debug)]
 #[command(name = "interceptor")]
@@ -29,6 +49,48 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| cli.verbosity.clone());
     tracing_subscriber::fmt().with_env_filter(filter).init();
+
+    // Display copyright watermark
+    println!("\n╔═══════════════════════════════════════════════════════════════════════════╗");
+    println!("║                          INT3RCEPTOR v2.0.0                               ║");
+    println!("║                   Copyright (c) 2025 S1BGr0uP                             ║");
+    println!("║                        All Rights Reserved                                ║");
+    println!("╠═══════════════════════════════════════════════════════════════════════════╣");
+    println!("║  PROPRIETARY SOFTWARE - Licensed under Proprietary License                ║");
+    println!(
+        "║  Build: {}                                    ║",
+        BUILD_FINGERPRINT
+    );
+    println!("║  License: {}  ║", LICENSE_URL);
+    println!("╚═══════════════════════════════════════════════════════════════════════════╝\n");
+
+    info!("{}", COPYRIGHT_NOTICE);
+
+    // Initialize license manager
+    let mut license_manager = interceptor_core::LicenseManager::new();
+    license_manager.load_license()?;
+
+    let license_tier = license_manager.tier();
+    if let Some(license) = license_manager.license() {
+        println!(
+            "📜 License: {} - {}",
+            match license_tier {
+                interceptor_core::LicenseTier::Free => "FREE (Personal Use)",
+                interceptor_core::LicenseTier::Professional => "PROFESSIONAL",
+                interceptor_core::LicenseTier::Enterprise => "ENTERPRISE",
+            },
+            license.licensee
+        );
+
+        if let Some(days) = license.days_until_expiration() {
+            if days < 30 {
+                println!("⚠️  License expires in {} days", days);
+            }
+        }
+
+        println!("   Max Connections: {}", license_tier.max_connections());
+        println!("   Max RPS: {}\n", license_tier.max_rps());
+    }
 
     let db_path =
         std::env::var("INTERCEPTOR_DB_PATH").unwrap_or_else(|_| "data/interceptor.sqlite".into());

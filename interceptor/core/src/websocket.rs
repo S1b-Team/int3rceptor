@@ -203,9 +203,9 @@ mod tests {
     #[test]
     fn test_ws_capture() {
         let capture = WsCapture::new(100);
-        
+
         capture.register_connection("conn1".to_string(), "wss://example.com/ws".to_string());
-        
+
         let frame_id = capture.capture_frame(
             "conn1".to_string(),
             WsDirection::ClientToServer,
@@ -213,9 +213,9 @@ mod tests {
             b"Hello".to_vec(),
             true,
         );
-        
+
         assert_eq!(frame_id, 1);
-        
+
         let frames = capture.get_frames("conn1");
         assert_eq!(frames.len(), 1);
         assert_eq!(frames[0].payload, b"Hello");
@@ -226,10 +226,10 @@ mod tests {
         let payload = vec![0x7f, 0x9f, 0x4d, 0x51, 0x58];
         let mask = [0x37, 0xfa, 0x21, 0x3d];
         let unmasked = WsFrameParser::unmask_payload(&payload, &mask);
-        
+
         // Verify unmasking works
         assert_ne!(unmasked, payload);
-        
+
         // Verify masking is symmetric
         let remasked = WsFrameParser::mask_payload(&unmasked, &mask);
         assert_eq!(remasked, payload);

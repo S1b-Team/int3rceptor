@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RuleType {
@@ -15,7 +15,7 @@ pub enum MatchCondition {
     UrlContains(String),
     HeaderContains(String, String), // Key, Value substring
     BodyContains(String),
-    
+
     // Advanced regex matching
     UrlRegex(String),
     HeaderRegex(String, String), // Key, Value regex
@@ -28,7 +28,7 @@ pub enum Action {
     ReplaceBody(String, String), // Target, Replacement
     SetHeader(String, String),   // Key, Value
     RemoveHeader(String),        // Key
-    
+
     // Advanced regex replacements with capture groups
     RegexReplaceBody(String, String), // Regex pattern, Replacement (supports $1, $2, etc.)
     RegexReplaceHeader(String, String, String), // Header key, Regex pattern, Replacement
@@ -74,7 +74,7 @@ impl RuleEngine {
         let mut cache = self.regex_cache.write().unwrap();
         cache.clear();
     }
-    
+
     /// Get or compile a regex pattern (with caching)
     fn get_regex(&self, pattern: &str) -> Option<Regex> {
         // Check cache first
@@ -84,7 +84,7 @@ impl RuleEngine {
                 return Some(regex.clone());
             }
         }
-        
+
         // Compile and cache
         match Regex::new(pattern) {
             Ok(regex) => {
@@ -99,11 +99,7 @@ impl RuleEngine {
         }
     }
 
-    pub fn apply_request_rules(
-        &self,
-        parts: &mut http::request::Parts,
-        body: &mut Vec<u8>,
-    ) {
+    pub fn apply_request_rules(&self, parts: &mut http::request::Parts, body: &mut Vec<u8>) {
         let rules = self.rules.read().unwrap();
         for rule in rules.iter() {
             if !rule.active || rule.rule_type != RuleType::Request {
@@ -116,11 +112,7 @@ impl RuleEngine {
         }
     }
 
-    pub fn apply_response_rules(
-        &self,
-        parts: &mut http::response::Parts,
-        body: &mut Vec<u8>,
-    ) {
+    pub fn apply_response_rules(&self, parts: &mut http::response::Parts, body: &mut Vec<u8>) {
         let rules = self.rules.read().unwrap();
         for rule in rules.iter() {
             if !rule.active || rule.rule_type != RuleType::Response {
@@ -133,12 +125,7 @@ impl RuleEngine {
         }
     }
 
-    fn matches_request(
-        &self,
-        rule: &Rule,
-        parts: &http::request::Parts,
-        body: &[u8],
-    ) -> bool {
+    fn matches_request(&self, rule: &Rule, parts: &http::request::Parts, body: &[u8]) -> bool {
         match &rule.condition {
             MatchCondition::UrlContains(s) => parts.uri.to_string().contains(s),
             MatchCondition::UrlRegex(pattern) => {
@@ -166,9 +153,7 @@ impl RuleEngine {
                     false
                 }
             }
-            MatchCondition::BodyContains(s) => {
-                String::from_utf8_lossy(body).contains(s)
-            }
+            MatchCondition::BodyContains(s) => String::from_utf8_lossy(body).contains(s),
             MatchCondition::BodyRegex(pattern) => {
                 if let Some(regex) = self.get_regex(pattern) {
                     regex.is_match(&String::from_utf8_lossy(body))
@@ -179,12 +164,7 @@ impl RuleEngine {
         }
     }
 
-    fn matches_response(
-        &self,
-        rule: &Rule,
-        _parts: &http::response::Parts,
-        body: &[u8],
-    ) -> bool {
+    fn matches_response(&self, rule: &Rule, _parts: &http::response::Parts, body: &[u8]) -> bool {
         match &rule.condition {
             MatchCondition::UrlContains(_) => false, // Response doesn't have URI
             MatchCondition::UrlRegex(_) => false,
@@ -206,9 +186,7 @@ impl RuleEngine {
                     false
                 }
             }
-            MatchCondition::BodyContains(s) => {
-                String::from_utf8_lossy(body).contains(s)
-            }
+            MatchCondition::BodyContains(s) => String::from_utf8_lossy(body).contains(s),
             MatchCondition::BodyRegex(pattern) => {
                 if let Some(regex) = self.get_regex(pattern) {
                     regex.is_match(&String::from_utf8_lossy(body))
@@ -219,21 +197,16 @@ impl RuleEngine {
         }
     }
 
-    fn execute_action(
-        &self,
-        rule: &Rule,
-        headers: &mut http::HeaderMap,
-        body: &mut Vec<u8>,
-    ) {
+    fn execute_action(&self, rule: &Rule, headers: &mut http::HeaderMap, body: &mut Vec<u8>) {
         match &rule.action {
             Action::ReplaceBody(target, replacement) => {
                 let s = String::from_utf8_lossy(body).to_string();
                 let new_s = s.replace(target, replacement);
                 *body = new_s.into_bytes();
-                
+
                 // Update Content-Length if present
                 if headers.contains_key(http::header::CONTENT_LENGTH) {
-                     headers.insert(
+                    headers.insert(
                         http::header::CONTENT_LENGTH,
                         body.len().to_string().parse().unwrap(),
                     );
@@ -244,7 +217,7 @@ impl RuleEngine {
                     let s = String::from_utf8_lossy(body).to_string();
                     let new_s = regex.replace_all(&s, replacement.as_str()).to_string();
                     *body = new_s.into_bytes();
-                    
+
                     // Update Content-Length if present
                     if headers.contains_key(http::header::CONTENT_LENGTH) {
                         headers.insert(
@@ -267,8 +240,11 @@ impl RuleEngine {
                     if let Ok(k) = http::header::HeaderName::from_bytes(header_key.as_bytes()) {
                         if let Some(val) = headers.get(&k) {
                             if let Ok(val_str) = val.to_str() {
-                                let new_val = regex.replace_all(val_str, replacement.as_str()).to_string();
-                                if let Ok(new_header_val) = http::header::HeaderValue::from_str(&new_val) {
+                                let new_val =
+                                    regex.replace_all(val_str, replacement.as_str()).to_string();
+                                if let Ok(new_header_val) =
+                                    http::header::HeaderValue::from_str(&new_val)
+                                {
                                     headers.insert(k, new_header_val);
                                 }
                             }
@@ -277,9 +253,9 @@ impl RuleEngine {
                 }
             }
             Action::RemoveHeader(k) => {
-                 if let Ok(k) = http::header::HeaderName::from_bytes(k.as_bytes()) {
+                if let Ok(k) = http::header::HeaderName::from_bytes(k.as_bytes()) {
                     headers.remove(k);
-                 }
+                }
             }
         }
     }

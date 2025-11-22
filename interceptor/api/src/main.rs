@@ -1,10 +1,10 @@
 use interceptor_api::serve;
 use interceptor_api::state::AppState;
+use interceptor_core::capture::RequestCapture;
+use interceptor_core::cert_manager::CertManager;
 use interceptor_core::connection_pool::ConnectionPool;
 use interceptor_core::rules::RuleEngine;
 use interceptor_core::storage::CaptureStorage;
-use interceptor_core::capture::RequestCapture;
-use interceptor_core::cert_manager::CertManager;
 use interceptor_core::{Intruder, ScopeManager, WsCapture};
 use std::{net::SocketAddr, sync::Arc};
 use tracing::info;
@@ -16,10 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let db_path =
         std::env::var("INTERCEPTOR_DB_PATH").unwrap_or_else(|_| "data/interceptor.sqlite".into());
     let storage = Arc::new(CaptureStorage::new(db_path)?);
-    let capture = Arc::new(RequestCapture::with_storage(
-        10_000,
-        Some(storage.clone()),
-    ));
+    let capture = Arc::new(RequestCapture::with_storage(10_000, Some(storage.clone())));
 
     let cert_manager = Arc::new(CertManager::new()?);
     let rules = Arc::new(RuleEngine::new());

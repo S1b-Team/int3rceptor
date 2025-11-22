@@ -71,7 +71,15 @@ impl ProxyServer {
                     let scope = scope.clone();
                     let tls = tls.clone();
                     async move {
-                        match handle_request(req, pool.clone(), capture.clone(), rules.clone(), scope.clone(), tls.clone()).await
+                        match handle_request(
+                            req,
+                            pool.clone(),
+                            capture.clone(),
+                            rules.clone(),
+                            scope.clone(),
+                            tls.clone(),
+                        )
+                        .await
                         {
                             Ok(res) => Ok::<_, hyper::Error>(res),
                             Err(err) => {
@@ -147,7 +155,7 @@ async fn forward_request(
     scope: Arc<ScopeManager>,
 ) -> Result<Response<ProxyBody>> {
     let target_uri = normalize_uri(req.uri(), req.headers())?;
-    
+
     // Check Scope
     if !scope.is_in_scope(&target_uri.to_string()) {
         // Forward without capturing
@@ -205,7 +213,10 @@ async fn forward_request(
     };
     capture.push(record, Some(captured_response));
 
-    Ok(Response::from_parts(parts, ProxyBody::from(Bytes::from(body_bytes))))
+    Ok(Response::from_parts(
+        parts,
+        ProxyBody::from(Bytes::from(body_bytes)),
+    ))
 }
 
 fn handle_connect(
@@ -265,7 +276,17 @@ async fn handle_tls_connect(
         let rules = rules.clone();
         let scope = scope.clone();
         let tls = Some(tls.clone());
-        async move { handle_request(req, pool.clone(), capture.clone(), rules.clone(), scope.clone(), tls).await }
+        async move {
+            handle_request(
+                req,
+                pool.clone(),
+                capture.clone(),
+                rules.clone(),
+                scope.clone(),
+                tls,
+            )
+            .await
+        }
     });
 
     http1::Builder::new()
