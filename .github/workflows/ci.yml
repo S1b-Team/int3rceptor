@@ -13,6 +13,9 @@ jobs:
     test-backend:
         name: Test Backend (Rust)
         runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: interceptor
         steps:
             - uses: actions/checkout@v4
 
@@ -23,6 +26,8 @@ jobs:
 
             - name: Rust Cache
               uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: interceptor
 
             - name: Check formatting
               run: cargo fmt -- --check
@@ -46,24 +51,25 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: "18"
-                  cache: "npm"
-                  cache-dependency-path: ui/package-lock.json
 
             - name: Install dependencies
-              working-directory: ./ui
+              working-directory: ./interceptor/ui
               run: npm ci
 
             - name: Type check
-              working-directory: ./ui
+              working-directory: ./interceptor/ui
               run: npm run type-check
 
             - name: Build
-              working-directory: ./ui
+              working-directory: ./interceptor/ui
               run: npm run build
 
     security-audit:
         name: Security Audit
         runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: interceptor
         steps:
             - uses: actions/checkout@v4
 

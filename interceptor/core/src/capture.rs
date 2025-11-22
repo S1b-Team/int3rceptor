@@ -127,6 +127,10 @@ impl RequestCapture {
         self.entries.read().len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.entries.read().is_empty()
+    }
+
     pub fn subscribe(&self) -> broadcast::Receiver<CaptureEntry> {
         self.notifier.subscribe()
     }

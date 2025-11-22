@@ -13,6 +13,12 @@ pub struct ConnectionPool {
     client: Arc<HttpClient>,
 }
 
+impl Default for ConnectionPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConnectionPool {
     pub fn new() -> Self {
         let mut connector = HttpConnector::new();

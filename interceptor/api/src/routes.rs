@@ -33,7 +33,10 @@ pub fn router() -> Router {
         )
         .route("/api/scope", get(get_scope).put(set_scope))
         .route("/api/intruder/generate", post(intruder_generate))
-        .route("/api/intruder/results", get(intruder_results).delete(intruder_clear))
+        .route(
+            "/api/intruder/results",
+            get(intruder_results).delete(intruder_clear),
+        )
         .route("/api/websocket/connections", get(ws_connections))
         .route("/api/websocket/frames/:connection_id", get(ws_frames))
         .route("/api/websocket/clear", delete(ws_clear))
@@ -218,18 +221,13 @@ struct ExportParams {
     format: ExportFormat,
 }
 
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Clone, Copy, Default)]
 #[serde(rename_all = "lowercase")]
 enum ExportFormat {
+    #[default]
     Json,
     Csv,
     Har,
-}
-
-impl Default for ExportFormat {
-    fn default() -> Self {
-        ExportFormat::Json
-    }
 }
 
 fn build_export_response(entries: Vec<CaptureEntry>, format: ExportFormat) -> impl IntoResponse {
@@ -352,7 +350,9 @@ async fn clear_rules(Extension(state): Extension<Arc<AppState>>) -> impl IntoRes
 }
 
 // Scope handlers
-async fn get_scope(Extension(state): Extension<Arc<AppState>>) -> Json<interceptor_core::scope::ScopeConfig> {
+async fn get_scope(
+    Extension(state): Extension<Arc<AppState>>,
+) -> Json<interceptor_core::scope::ScopeConfig> {
     Json(state.scope.get_config())
 }
 

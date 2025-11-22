@@ -1,6 +1,6 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
-use anyhow::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntruderConfig {
@@ -59,13 +59,13 @@ impl Intruder {
 
     fn generate_sniper(&self, template: &str, config: &IntruderConfig) -> Result<Vec<String>> {
         let mut requests = Vec::new();
-        
+
         for payload in &config.payloads {
             for position in &config.positions {
                 let mut modified = template.to_string();
                 let marker = format!("§{}§", position.name);
                 modified = modified.replace(&marker, payload);
-                
+
                 // Replace other markers with empty string
                 for other_pos in &config.positions {
                     if other_pos.name != position.name {
@@ -73,28 +73,28 @@ impl Intruder {
                         modified = modified.replace(&other_marker, "");
                     }
                 }
-                
+
                 requests.push(modified);
             }
         }
-        
+
         Ok(requests)
     }
 
     fn generate_battering(&self, template: &str, config: &IntruderConfig) -> Result<Vec<String>> {
         let mut requests = Vec::new();
-        
+
         for payload in &config.payloads {
             let mut modified = template.to_string();
-            
+
             for position in &config.positions {
                 let marker = format!("§{}§", position.name);
                 modified = modified.replace(&marker, payload);
             }
-            
+
             requests.push(modified);
         }
-        
+
         Ok(requests)
     }
 
@@ -102,37 +102,41 @@ impl Intruder {
         let mut requests = Vec::new();
         let payload_count = config.payloads.len();
         let empty_string = String::new();
-        
+
         for i in 0..payload_count {
             let mut modified = template.to_string();
-            
-            for (_pos_idx, position) in config.positions.iter().enumerate() {
+
+            for position in config.positions.iter() {
                 let marker = format!("§{}§", position.name);
                 let payload = config.payloads.get(i).unwrap_or(&empty_string);
                 modified = modified.replace(&marker, payload);
             }
-            
+
             requests.push(modified);
         }
-        
+
         Ok(requests)
     }
 
-    fn generate_cluster_bomb(&self, template: &str, config: &IntruderConfig) -> Result<Vec<String>> {
+    fn generate_cluster_bomb(
+        &self,
+        template: &str,
+        config: &IntruderConfig,
+    ) -> Result<Vec<String>> {
         let mut requests = Vec::new();
         let position_count = config.positions.len();
-        
+
         if position_count == 0 {
             return Ok(requests);
         }
-        
+
         // Generate all combinations
         let total_combinations = config.payloads.len().pow(position_count as u32);
-        
+
         for i in 0..total_combinations {
             let mut modified = template.to_string();
             let mut combination_index = i;
-            
+
             for position in &config.positions {
                 let payload_index = combination_index % config.payloads.len();
                 let payload = &config.payloads[payload_index];
@@ -140,10 +144,10 @@ impl Intruder {
                 modified = modified.replace(&marker, payload);
                 combination_index /= config.payloads.len();
             }
-            
+
             requests.push(modified);
         }
-        
+
         Ok(requests)
     }
 
