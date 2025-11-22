@@ -33,7 +33,7 @@
 -   [x] Docs for CA installation per OS
 -   [x] Authentication + request limiting + persistence hardening
 
-## Phase 5 — Automation & Rules (In Progress)
+## Phase 5 — Automation & Security (Complete)
 
 -   [x] Rule Engine Core (Match & Replace)
 -   [x] API Endpoints for Rules (CRUD)
@@ -44,11 +44,11 @@
 -   [x] Intruder UI (Professional Interface)
 -   [x] **Regex Matchers** (Advanced pattern matching in rules)
 -   [x] **WebSocket Interception** (Capture WS traffic)
--   [ ] Scripting Support (Lua/Wasm)
+-   [x] **Enterprise Security Suite** (Licensing, Obfuscation, Watermarking)
 
-## Phase 6 — Future Enhancements
+## Phase 6 — Next Gen Core (In Progress)
 
--   [ ] WebSocket Interception
--   [ ] HTTP/2 Support
+-   [ ] **HTTP/2 Support**: Full support for HTTP/2 multiplexing and ALPN negotiation.
+-   [ ] **Plugin System**: Wasm-based extension system for custom logic.
+-   [ ] Scripting Support (via Plugin System)
 -   [ ] Collaborative Features (Team Mode)
--   [ ] Plugin System

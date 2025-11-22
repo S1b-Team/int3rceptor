@@ -7,7 +7,7 @@ use crate::tls::TlsInterceptor;
 use http_body_util::BodyExt;
 use hyper::body::{Bytes, Incoming};
 use hyper::header::{HeaderMap, HOST};
-use hyper::server::conn::http1;
+
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, Uri};
 use hyper_util::rt::{TokioExecutor, TokioIo};
@@ -289,11 +289,10 @@ async fn handle_tls_connect(
         }
     });
 
-    http1::Builder::new()
-        .preserve_header_case(true)
-        .title_case_headers(true)
+    AutoBuilder::new(TokioExecutor::new())
         .serve_connection(stream, service)
-        .await?;
+        .await
+        .map_err(|e| ProxyError::Other(e.to_string()))?;
     Ok(())
 }
 
