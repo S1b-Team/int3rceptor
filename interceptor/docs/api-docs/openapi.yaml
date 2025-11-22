@@ -1,0 +1,189 @@
+openapi: 3.0.0
+info:
+  title: Int3rceptor API
+  description: Control and monitor the Int3rceptor proxy programmatically.
+  version: 1.0.0
+  contact:
+    name: S1bGr0up
+    url: https://github.com/S1b-Team/int3rceptor
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Token
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /traffic:
+    get:
+      summary: List captured traffic
+      description: Retrieve a list of captured HTTP/HTTPS requests and responses.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of items to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Offset for pagination
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search term to filter by URL or content
+      responses:
+        '200':
+          description: A list of traffic items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrafficItem'
+
+  /traffic/{id}:
+    get:
+      summary: Get traffic details
+      description: Retrieve full details of a specific request/response pair.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detailed traffic item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrafficItem'
+        '404':
+          description: Traffic item not found
+
+  /scope:
+    get:
+      summary: Get scope configuration
+      description: Retrieve current include/exclude scope rules.
+      responses:
+        '200':
+          description: Current scope configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeConfig'
+    post:
+      summary: Add scope rule
+      description: Add a new pattern to the scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopeRule'
+      responses:
+        '201':
+          description: Scope rule created
+
+  /intercept/action:
+    post:
+      summary: Control interception
+      description: Perform an action on a paused request (forward, drop, modify).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId:
+                  type: string
+                action:
+                  type: string
+                  enum: [forward, drop]
+                modifications:
+                  $ref: '#/components/schemas/RequestModifications'
+      responses:
+        '200':
+          description: Action processed
+
+components:
+  schemas:
+    TrafficItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        method:
+          type: string
+        url:
+          type: string
+        statusCode:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        request:
+          $ref: '#/components/schemas/HttpMessage'
+        response:
+          $ref: '#/components/schemas/HttpMessage'
+
+    HttpMessage:
+      type: object
+      properties:
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        body:
+          type: string
+        size:
+          type: integer
+
+    ScopeConfig:
+      type: object
+      properties:
+        include:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScopeRule'
+        exclude:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScopeRule'
+
+    ScopeRule:
+      type: object
+      properties:
+        pattern:
+          type: string
+        enabled:
+          type: boolean
+        type:
+          type: string
+          enum: [include, exclude]
+
+    RequestModifications:
+      type: object
+      properties:
+        method:
+          type: string
+        url:
+          type: string
+        headers:
+          type: object
+        body:
+          type: string

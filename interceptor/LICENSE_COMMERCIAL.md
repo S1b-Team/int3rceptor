@@ -1,9 +1,15 @@
+<div align="center">
+
+![Interceptor Banner](interceptor/assets/banner.png)
+
 # Commercial License Agreement
+
+</div>
 
 ## Interceptor - Commercial Use License
 
 **Version**: 1.0  
-**Effective Date**: 2025-11-20  
+**Effective Date**: 2025-11-21  
 **Licensor**: S1BGr0uP
 
 ---
@@ -184,5 +190,5 @@ Contact us to discuss your specific needs.
 
 ---
 
-**Last Updated**: 2025-11-20  
-**Version**: 1.0
+**Last Updated**: 2025-11-21
+**Version**: 1.0.1
