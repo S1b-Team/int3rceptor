@@ -13,9 +13,6 @@ jobs:
     test-backend:
         name: Test Backend (Rust)
         runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: interceptor
         steps:
             - uses: actions/checkout@v4
 
@@ -26,8 +23,6 @@ jobs:
 
             - name: Rust Cache
               uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: interceptor
 
             - name: Check formatting
               run: cargo fmt -- --check
@@ -53,23 +48,20 @@ jobs:
                   node-version: "18"
 
             - name: Install dependencies
-              working-directory: ./interceptor/ui
+              working-directory: ./ui
               run: npm ci
 
             - name: Type check
-              working-directory: ./interceptor/ui
+              working-directory: ./ui
               run: npm run type-check
 
             - name: Build
-              working-directory: ./interceptor/ui
+              working-directory: ./ui
               run: npm run build
 
     security-audit:
         name: Security Audit
         runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: interceptor
         steps:
             - uses: actions/checkout@v4
 
