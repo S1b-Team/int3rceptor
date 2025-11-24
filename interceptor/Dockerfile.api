@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1
+FROM rust:1 as build
+WORKDIR /app
+COPY . .
+RUN cargo build --release -p api
+
+FROM debian:bookworm-slim
+RUN useradd -m runner
+WORKDIR /home/runner
+COPY --from=build /app/target/release/interceptor-api /usr/local/bin/interceptor-api
+EXPOSE 3000 8080
+USER runner
+CMD ["interceptor-api"]

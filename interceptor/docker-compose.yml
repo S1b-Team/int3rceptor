@@ -1,0 +1,38 @@
+# Docker Compose configuration for Int3rceptor
+
+version: '3.8'
+
+services:
+  interceptor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: int3rceptor
+    ports:
+      - "8080:8080"  # Proxy port
+      - "3000:3000"  # Dashboard port
+    volumes:
+      - interceptor-data:/app/data
+      - ./ca:/app/ca:ro  # Mount CA certificates (read-only)
+    environment:
+      - INTERCEPTOR_DB_PATH=/app/data/interceptor.sqlite
+      - INTERCEPTOR_MAX_CONCURRENCY=128
+      - INTERCEPTOR_MAX_BODY_BYTES=10485760  # 10MB
+      - RUST_LOG=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - interceptor-network
+
+volumes:
+  interceptor-data:
+    driver: local
+
+networks:
+  interceptor-network:
+    driver: bridge
