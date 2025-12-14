@@ -8,8 +8,6 @@ mod rules;
 mod types;
 
 pub use detection::*;
-pub use rules::*;
-pub use types::*;
 
 use crate::capture::CaptureEntry;
 use anyhow::Result;
