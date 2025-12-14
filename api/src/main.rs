@@ -11,7 +11,7 @@ use interceptor_core::plugin::config::PluginSystemConfig;
 use interceptor_core::plugin::manager::PluginManager;
 use interceptor_core::rules::RuleEngine;
 use interceptor_core::storage::CaptureStorage;
-use interceptor_core::{Intruder, ScopeManager, WsCapture};
+use interceptor_core::{Intruder, Scanner, ScopeManager, WsCapture};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::info;
@@ -142,6 +142,7 @@ async fn main() -> anyhow::Result<()> {
         rules,
         scope,
         intruder,
+        scanner: Arc::new(Scanner::new()),
         ws_capture,
         api_token,
         max_body_bytes,

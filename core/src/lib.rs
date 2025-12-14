@@ -9,6 +9,7 @@ pub mod metrics;
 pub mod plugin;
 pub mod proxy;
 pub mod rules;
+pub mod scanner;
 pub mod scope;
 pub mod security;
 pub mod storage;
@@ -17,10 +18,14 @@ pub mod websocket;
 
 pub use capture::{CaptureQuery, RequestCapture};
 pub use cert_manager::CertManager;
+pub use connection_pool::ConnectionPool;
 pub use integration::{nowaru_bridge::NowaruBridge, voidwalker_bridge::VoidwalkerBridge};
 pub use intruder::Intruder;
 pub use license::{License, LicenseManager, LicenseTier};
 pub use metrics::{metrics, Metrics, MetricsSnapshot};
+pub use scanner::{
+    DetectionRule, Finding, ScanConfig, ScanStats, Scanner, Severity, VulnerabilityCategory,
+};
 pub use scope::ScopeManager;
 pub use security::{
     constant_time_compare, AuditEntry, AuditEntryBuilder, AuditEventType, AuditLogger,

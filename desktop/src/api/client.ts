@@ -172,6 +172,47 @@ class INT3RCEPTORClient {
     return response.data
   }
 
+  // Scanner API
+  async scannerGetConfig() {
+    const response = await this.client.get('/scanner/config')
+    return response.data
+  }
+
+  async scannerSetConfig(config: ScanConfig) {
+    const response = await this.client.put('/scanner/config', config)
+    return response.data
+  }
+
+  async scannerGetRules() {
+    const response = await this.client.get('/scanner/rules')
+    return response.data
+  }
+
+  async scannerStart(targets: string[]) {
+    const response = await this.client.post('/scanner/start', { targets })
+    return response.data
+  }
+
+  async scannerStop() {
+    const response = await this.client.post('/scanner/stop')
+    return response.data
+  }
+
+  async scannerGetFindings() {
+    const response = await this.client.get('/scanner/findings')
+    return response.data
+  }
+
+  async scannerClearFindings() {
+    const response = await this.client.delete('/scanner/findings')
+    return response.data
+  }
+
+  async scannerGetStats(): Promise<ScanStats> {
+    const response = await this.client.get('/scanner/stats')
+    return response.data
+  }
+
   // Health check
   async healthCheck() {
     try {
@@ -237,4 +278,60 @@ export interface IntruderResult {
   status_code: number
   response_length: number
   duration_ms: number
+}
+
+// Scanner Types
+export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
+
+export type VulnerabilityCategory =
+  | 'injection'
+  | 'xss'
+  | 'broken_auth'
+  | 'sensitive_data_exposure'
+  | 'xxe'
+  | 'broken_access_control'
+  | 'security_misconfiguration'
+  | 'csrf'
+  | 'vulnerable_components'
+  | 'insufficient_logging'
+  | 'ssrf'
+  | 'path_traversal'
+  | 'information_disclosure'
+  | 'open_redirect'
+  | 'other'
+
+export interface ScanConfig {
+  passive: boolean
+  active: boolean
+  categories: VulnerabilityCategory[]
+  concurrency: number
+  delay_ms: number
+  follow_redirects: boolean
+  max_depth: number
+}
+
+export interface Finding {
+  id: string
+  rule_id: string
+  category: VulnerabilityCategory
+  severity: Severity
+  title: string
+  description: string
+  url: string
+  evidence: string
+  remediation: string
+  references: string[]
+  timestamp: string
+  confirmed: boolean
+}
+
+export interface ScanStats {
+  is_running: boolean
+  requests_scanned: number
+  vulnerabilities_found: number
+  critical_count: number
+  high_count: number
+  medium_count: number
+  low_count: number
+  info_count: number
 }

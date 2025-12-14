@@ -49,6 +49,19 @@ pub fn router() -> Router {
         )
         .route("/api/intruder/start", post(intruder_start))
         .route("/api/intruder/stop", post(intruder_stop))
+        // Scanner routes
+        .route(
+            "/api/scanner/config",
+            get(scanner_get_config).put(scanner_set_config),
+        )
+        .route("/api/scanner/rules", get(scanner_get_rules))
+        .route("/api/scanner/start", post(scanner_start))
+        .route("/api/scanner/stop", post(scanner_stop))
+        .route(
+            "/api/scanner/findings",
+            get(scanner_get_findings).delete(scanner_clear_findings),
+        )
+        .route("/api/scanner/stats", get(scanner_get_stats))
         .route("/api/websocket/connections", get(ws_connections))
         .route("/api/websocket/frames/:connection_id", get(ws_frames))
         .route("/api/websocket/clear", delete(ws_clear))
@@ -590,4 +603,60 @@ async fn toggle_plugin(
             Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
         }
     }
+}
+
+// ============= SCANNER HANDLERS =============
+
+async fn scanner_get_config(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.scanner.get_config())
+}
+
+async fn scanner_set_config(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(config): Json<interceptor_core::ScanConfig>,
+) -> impl IntoResponse {
+    state.scanner.configure(config);
+    StatusCode::OK
+}
+
+async fn scanner_get_rules(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.scanner.get_rules())
+}
+
+#[derive(Deserialize)]
+struct ScanStartRequest {
+    targets: Vec<String>,
+}
+
+async fn scanner_start(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(payload): Json<ScanStartRequest>,
+) -> impl IntoResponse {
+    match state
+        .scanner
+        .clone()
+        .start_active_scan(payload.targets, state.pool.clone())
+        .await
+    {
+        Ok(scan_id) => Json(json!({ "scan_id": scan_id, "status": "started" })).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
+}
+
+async fn scanner_stop(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    state.scanner.stop_scan();
+    Json(json!({ "status": "stopped" }))
+}
+
+async fn scanner_get_findings(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.scanner.get_findings())
+}
+
+async fn scanner_clear_findings(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    state.scanner.clear_findings();
+    StatusCode::OK
+}
+
+async fn scanner_get_stats(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.scanner.get_stats())
 }

@@ -28,6 +28,7 @@ const tabs = [
   { id: 'websocket', name: 'WebSocket', icon: '🔌', module: 'VOIDWALKER' },
   { id: 'repeater', name: 'Repeater', icon: '🔁' },
   { id: 'intruder', name: 'Intruder', icon: '⚔️' },
+  { id: 'scanner', name: 'Scanner', icon: '🔍' },
   { id: 'plugins', name: 'Plugins', icon: '🧩' },
 ]
 
@@ -266,6 +267,9 @@ onUnmounted(() => {
 
         <!-- Intruder View -->
         <IntruderView v-else-if="currentTab === 'intruder'" />
+
+        <!-- Scanner View -->
+        <ScannerView v-else-if="currentTab === 'scanner'" />
 
         <!-- Settings View -->
         <SettingsView v-else-if="currentTab === 'settings'" />

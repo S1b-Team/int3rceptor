@@ -1,6 +1,6 @@
 use interceptor_core::{
     capture::RequestCapture, cert_manager::CertManager, connection_pool::ConnectionPool,
-    plugin::manager::PluginManager, rules::RuleEngine, Intruder, ScopeManager, WsCapture,
+    plugin::manager::PluginManager, rules::RuleEngine, Intruder, Scanner, ScopeManager, WsCapture,
 };
 use std::sync::Arc;
 
@@ -18,6 +18,7 @@ pub struct AppState {
     pub rules: Arc<RuleEngine>,
     pub scope: Arc<ScopeManager>,
     pub intruder: Arc<Intruder>,
+    pub scanner: Arc<Scanner>,
     pub ws_capture: Arc<WsCapture>,
     pub api_token: Option<Arc<String>>,
     pub max_body_bytes: usize,

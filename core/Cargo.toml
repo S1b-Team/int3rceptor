@@ -27,6 +27,10 @@ rusqlite.workspace = true
 regex = "1.10"
 obfstr = "0.4"
 once_cell = "1.19"
+# Scanner dependencies
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4"] }
+urlencoding = "2.1"
 # Plugin system (WASM)
 wasmtime = "17.0"
 wasmtime-wasi = "17.0"
