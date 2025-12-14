@@ -65,17 +65,10 @@ impl TlsConfig {
 }
 
 /// Serve the application with TLS support
-pub async fn serve_with_tls(
-    app: Router,
-    addr: SocketAddr,
-    tls_config: TlsConfig,
-) -> Result<()> {
+pub async fn serve_with_tls(app: Router, addr: SocketAddr, tls_config: TlsConfig) -> Result<()> {
     let rustls_config = tls_config.build_rustls_config().await?;
 
-    info!(
-        "Starting HTTPS server on https://{} with TLS enabled",
-        addr
-    );
+    info!("Starting HTTPS server on https://{} with TLS enabled", addr);
     info!("Certificate: {:?}", tls_config.cert_path);
     info!("Private Key: {:?}", tls_config.key_path);
     info!("HTTP/2: {}", tls_config.http2);
@@ -88,7 +81,10 @@ pub async fn serve_with_tls(
 
 /// Serve the application without TLS (HTTP only)
 pub async fn serve_without_tls(app: Router, addr: SocketAddr) -> Result<()> {
-    warn!("Starting HTTP server on http://{} WITHOUT TLS encryption", addr);
+    warn!(
+        "Starting HTTP server on http://{} WITHOUT TLS encryption",
+        addr
+    );
     warn!("⚠️  TLS is disabled. This is insecure for production use!");
 
     let listener = TcpListener::bind(addr)
@@ -130,15 +126,12 @@ pub mod dev {
     ) -> Result<()> {
         let mut params = CertificateParams::default();
         params.distinguished_name = DistinguishedName::new();
-        params.distinguished_name.push(
-            rcgen::DnType::CommonName,
-            "interceptor-api.local",
-        );
+        params
+            .distinguished_name
+            .push(rcgen::DnType::CommonName, "interceptor-api.local");
         params.subject_alt_names = vec![
             rcgen::SanType::DnsName("localhost".to_string()),
-            rcgen::SanType::IpAddress(std::net::IpAddr::V4(std::net::Ipv4Addr::new(
-                127, 0, 0, 1,
-            ))),
+            rcgen::SanType::IpAddress(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))),
         ];
 
         let cert = Certificate::from_params(params)?;

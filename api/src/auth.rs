@@ -11,7 +11,8 @@ use interceptor_core::security::{constant_time_compare, headers as security_head
 use once_cell::sync::Lazy;
 
 /// Global rate limiter: 100 requests per minute per IP
-static RATE_LIMITER: Lazy<RateLimiter> = Lazy::new(|| RateLimiter::new(100, Duration::from_secs(60)));
+static RATE_LIMITER: Lazy<RateLimiter> =
+    Lazy::new(|| RateLimiter::new(100, Duration::from_secs(60)));
 
 /// Authentication middleware with timing-safe comparison
 pub async fn require_auth(
@@ -88,10 +89,7 @@ pub async fn rate_limit(
                 [
                     ("X-RateLimit-Limit", "100"),
                     ("X-RateLimit-Remaining", "0"),
-                    (
-                        "Retry-After",
-                        &retry_after.as_secs().to_string(),
-                    ),
+                    ("Retry-After", &retry_after.as_secs().to_string()),
                 ],
                 "Rate limit exceeded. Please slow down.",
             )
@@ -107,10 +105,7 @@ pub async fn security_headers_middleware(req: Request, next: Next) -> Response {
     // Add security headers
     let headers = response.headers_mut();
     for (name, value) in security_headers::all() {
-        if let (Ok(name), Ok(value)) = (
-            name.parse::<HeaderName>(),
-            value.parse::<HeaderValue>(),
-        ) {
+        if let (Ok(name), Ok(value)) = (name.parse::<HeaderName>(), value.parse::<HeaderValue>()) {
             headers.insert(name, value);
         }
     }

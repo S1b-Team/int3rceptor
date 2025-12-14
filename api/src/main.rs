@@ -3,7 +3,6 @@ use interceptor_api::csrf::CsrfProtection;
 use interceptor_api::ip_filter::{IpFilter, IpFilterConfig};
 use interceptor_api::models::{AppSettings, ProxyConfig, UiConfig};
 use interceptor_api::serve;
-use tokio::sync::RwLock;
 use interceptor_api::state::AppState;
 use interceptor_core::capture::RequestCapture;
 use interceptor_core::cert_manager::CertManager;
@@ -14,6 +13,7 @@ use interceptor_core::rules::RuleEngine;
 use interceptor_core::storage::CaptureStorage;
 use interceptor_core::{Intruder, ScopeManager, WsCapture};
 use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::RwLock;
 use tracing::info;
 
 #[tokio::main]
@@ -85,8 +85,8 @@ async fn main() -> anyhow::Result<()> {
         .map(|v| v == "1" || v.to_lowercase() == "true")
         .unwrap_or(false)
     {
-        let secret = std::env::var("CSRF_SECRET")
-            .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+        let secret =
+            std::env::var("CSRF_SECRET").unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
         info!("CSRF protection enabled");
         Some(Arc::new(CsrfProtection::new(secret)))
     } else {

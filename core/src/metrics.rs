@@ -182,7 +182,8 @@ impl Metrics {
     /// Record request duration
     pub fn record_request_duration(&self, duration: Duration) {
         let micros = duration.as_micros() as u64;
-        self.request_duration_sum_us.fetch_add(micros, Ordering::Relaxed);
+        self.request_duration_sum_us
+            .fetch_add(micros, Ordering::Relaxed);
         self.request_duration_count.fetch_add(1, Ordering::Relaxed);
 
         // Update max (compare-and-swap loop)
@@ -532,9 +533,9 @@ mod tests {
         let mut h = LatencyHistogram::new();
 
         h.record(Duration::from_micros(500)); // <1ms bucket
-        h.record(Duration::from_millis(3));   // <5ms bucket
-        h.record(Duration::from_millis(50));  // <100ms bucket
-        h.record(Duration::from_secs(10));    // >5s bucket
+        h.record(Duration::from_millis(3)); // <5ms bucket
+        h.record(Duration::from_millis(50)); // <100ms bucket
+        h.record(Duration::from_secs(10)); // >5s bucket
 
         let snap = h.snapshot();
         assert_eq!(snap.lt_1ms, 1);

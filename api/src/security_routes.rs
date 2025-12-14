@@ -10,9 +10,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 /// Get IP filter configuration
-pub async fn get_ip_filter_config(
-    Extension(state): Extension<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn get_ip_filter_config(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
     Json(state.ip_filter.get_config())
 }
 
@@ -146,9 +144,7 @@ pub async fn rotate_audit_log(
 }
 
 /// Get audit log info
-pub async fn get_audit_log_info(
-    Extension(state): Extension<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn get_audit_log_info(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
     if let Some(ref logger) = state.audit_logger {
         Json(serde_json::json!({
             "enabled": true,

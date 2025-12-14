@@ -86,7 +86,10 @@ impl RateLimiter {
             max_requests,
             window,
             buckets: RwLock::new(HashMap::new()),
-            global_bucket: RwLock::new(TokenBucket::new(max_requests.saturating_mul(10), refill_rate)),
+            global_bucket: RwLock::new(TokenBucket::new(
+                max_requests.saturating_mul(10),
+                refill_rate,
+            )),
         }
     }
 
@@ -147,8 +150,13 @@ impl Default for RateLimiter {
 
 #[derive(Debug, Clone)]
 pub enum RateLimitResult {
-    Allowed { remaining: u32 },
-    Limited { remaining: u32, retry_after: Duration },
+    Allowed {
+        remaining: u32,
+    },
+    Limited {
+        remaining: u32,
+        retry_after: Duration,
+    },
 }
 
 impl RateLimitResult {
@@ -819,7 +827,12 @@ impl AuditLogger {
         )
     }
 
-    pub fn log_security_event(&self, source_ip: Option<&str>, event: &str, severity: AuditSeverity) -> u64 {
+    pub fn log_security_event(
+        &self,
+        source_ip: Option<&str>,
+        event: &str,
+        severity: AuditSeverity,
+    ) -> u64 {
         self.log(
             AuditEntryBuilder::new(AuditEventType::Security, event)
                 .severity(severity)
@@ -1132,7 +1145,8 @@ pub mod headers {
         "Strict-Transport-Security",
         "max-age=31536000; includeSubDomains; preload",
     );
-    pub const REFERRER_POLICY: (&str, &str) = ("Referrer-Policy", "strict-origin-when-cross-origin");
+    pub const REFERRER_POLICY: (&str, &str) =
+        ("Referrer-Policy", "strict-origin-when-cross-origin");
     pub const PERMISSIONS_POLICY: (&str, &str) = (
         "Permissions-Policy",
         "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
@@ -1406,8 +1420,6 @@ mod tests {
         let hdrs = headers::all();
         assert!(hdrs.len() >= 6);
         assert!(hdrs.iter().any(|(k, _)| *k == "X-Content-Type-Options"));
-        assert!(hdrs
-            .iter()
-            .any(|(k, _)| *k == "Strict-Transport-Security"));
+        assert!(hdrs.iter().any(|(k, _)| *k == "Strict-Transport-Security"));
     }
 }

@@ -10,7 +10,7 @@ pub mod state;
 pub mod tls;
 pub mod websocket;
 
-use auth::{rate_limit, require_auth, request_size_limit, security_headers_middleware};
+use auth::{rate_limit, request_size_limit, require_auth, security_headers_middleware};
 use axum::{middleware, routing::get, Extension, Router};
 use state::AppState;
 use std::net::SocketAddr;

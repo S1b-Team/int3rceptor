@@ -282,8 +282,7 @@ async fn forward_request(
     // Execute on_response plugin hook
     if let Some(ref plugin_manager) = plugins {
         use crate::plugin::hooks::{HookContext, PluginHook};
-        let hook_ctx = HookContext::new()
-            .with_status_code(parts.status.as_u16());
+        let hook_ctx = HookContext::new().with_status_code(parts.status.as_u16());
         let _ = plugin_manager.execute_hook(PluginHook::OnResponse, hook_ctx);
     }
 
@@ -340,7 +339,9 @@ fn handle_connect(
         let rules = rules.clone();
         let scope = scope.clone();
         tokio::spawn(async move {
-            if let Err(err) = handle_tls_connect(req, capture, pool, rules, scope, tls, plugins).await {
+            if let Err(err) =
+                handle_tls_connect(req, capture, pool, rules, scope, tls, plugins).await
+            {
                 warn!(%err, "tls intercept error");
             }
         });
@@ -393,7 +394,7 @@ async fn handle_tls_connect(
         async move {
             handle_request(
                 req,
-               pool.clone(),
+                pool.clone(),
                 capture.clone(),
                 rules.clone(),
                 scope.clone(),

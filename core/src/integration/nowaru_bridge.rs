@@ -51,10 +51,7 @@ pub enum NowaruEvent {
         duration_ms: Option<u128>,
     },
     /// Processing error
-    ProcessingError {
-        id: u64,
-        error: String,
-    },
+    ProcessingError { id: u64, error: String },
     /// Stats updated
     StatsUpdated {
         total_processed: u64,
@@ -101,10 +98,7 @@ impl NowaruBridge {
     }
 
     /// Start real-time processing of captures
-    pub async fn start_realtime_processing(
-        &self,
-        capture: Arc<RequestCapture>,
-    ) {
+    pub async fn start_realtime_processing(&self, capture: Arc<RequestCapture>) {
         if !self.config.enabled || !self.config.realtime {
             info!("NOWARU bridge: real-time processing disabled");
             return;

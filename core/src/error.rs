@@ -337,7 +337,10 @@ pub enum ProxyError {
     LicenseExpired { expiry: String },
 
     #[error("Feature '{feature}' requires {required_tier} license")]
-    LicenseFeatureDisabled { feature: String, required_tier: String },
+    LicenseFeatureDisabled {
+        feature: String,
+        required_tier: String,
+    },
 
     // === Lock Errors ===
     #[error("Lock poisoned: {0}")]
@@ -385,9 +388,9 @@ impl ProxyError {
             Self::Database(_) | Self::DatabaseConnection(_) => ErrorCode::DatabaseConnection,
             Self::DatabaseQuery { .. } => ErrorCode::DatabaseQuery,
             Self::StorageFull { .. } => ErrorCode::StorageFull,
-            Self::Serde(_) | Self::SerializationFailed { .. } | Self::DeserializationFailed { .. } => {
-                ErrorCode::Internal
-            }
+            Self::Serde(_)
+            | Self::SerializationFailed { .. }
+            | Self::DeserializationFailed { .. } => ErrorCode::Internal,
             Self::RuleInvalid(_) => ErrorCode::RuleInvalid,
             Self::RuleNotFound(_) => ErrorCode::RuleNotFound,
             Self::RegexInvalid { .. } => ErrorCode::RuleRegexInvalid,
@@ -527,13 +530,11 @@ pub trait RwLockExt<T> {
 
 impl<T> RwLockExt<T> for RwLock<T> {
     fn try_read_safe(&self) -> Result<RwLockReadGuard<'_, T>> {
-        self.try_read()
-            .map_err(|_| ProxyError::LockTimeout)
+        self.try_read().map_err(|_| ProxyError::LockTimeout)
     }
 
     fn try_write_safe(&self) -> Result<RwLockWriteGuard<'_, T>> {
-        self.try_write()
-            .map_err(|_| ProxyError::LockTimeout)
+        self.try_write().map_err(|_| ProxyError::LockTimeout)
     }
 
     fn read_safe(&self) -> Result<RwLockReadGuard<'_, T>> {

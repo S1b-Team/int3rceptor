@@ -254,9 +254,15 @@ mod tests {
         let db_path = dir.path().join("test.db");
         let storage = CaptureStorage::new(&db_path).unwrap();
 
-        storage.insert(&create_test_entry(1, "GET", "/api/users", Some(200))).unwrap();
-        storage.insert(&create_test_entry(2, "POST", "/api/users", Some(201))).unwrap();
-        storage.insert(&create_test_entry(3, "GET", "/api/posts", Some(200))).unwrap();
+        storage
+            .insert(&create_test_entry(1, "GET", "/api/users", Some(200)))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(2, "POST", "/api/users", Some(201)))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(3, "GET", "/api/posts", Some(200)))
+            .unwrap();
 
         let query = CaptureQuery {
             method: Some("GET".to_string()),
@@ -274,8 +280,22 @@ mod tests {
         let db_path = dir.path().join("test.db");
         let storage = CaptureStorage::new(&db_path).unwrap();
 
-        storage.insert(&create_test_entry(1, "GET", "https://api.example.com/users", Some(200))).unwrap();
-        storage.insert(&create_test_entry(2, "GET", "https://other.com/data", Some(200))).unwrap();
+        storage
+            .insert(&create_test_entry(
+                1,
+                "GET",
+                "https://api.example.com/users",
+                Some(200),
+            ))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(
+                2,
+                "GET",
+                "https://other.com/data",
+                Some(200),
+            ))
+            .unwrap();
 
         let query = CaptureQuery {
             host: Some("example.com".to_string()),
@@ -293,9 +313,15 @@ mod tests {
         let db_path = dir.path().join("test.db");
         let storage = CaptureStorage::new(&db_path).unwrap();
 
-        storage.insert(&create_test_entry(1, "GET", "/success", Some(200))).unwrap();
-        storage.insert(&create_test_entry(2, "GET", "/error", Some(500))).unwrap();
-        storage.insert(&create_test_entry(3, "GET", "/not-found", Some(404))).unwrap();
+        storage
+            .insert(&create_test_entry(1, "GET", "/success", Some(200)))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(2, "GET", "/error", Some(500)))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(3, "GET", "/not-found", Some(404)))
+            .unwrap();
 
         let query = CaptureQuery {
             status: Some(200),
@@ -313,8 +339,22 @@ mod tests {
         let db_path = dir.path().join("test.db");
         let storage = CaptureStorage::new(&db_path).unwrap();
 
-        storage.insert(&create_test_entry(1, "GET", "https://secure.com", Some(200))).unwrap();
-        storage.insert(&create_test_entry(2, "GET", "http://insecure.com", Some(200))).unwrap();
+        storage
+            .insert(&create_test_entry(
+                1,
+                "GET",
+                "https://secure.com",
+                Some(200),
+            ))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(
+                2,
+                "GET",
+                "http://insecure.com",
+                Some(200),
+            ))
+            .unwrap();
 
         let query = CaptureQuery {
             tls: Some(true),
@@ -332,8 +372,12 @@ mod tests {
         let db_path = dir.path().join("test.db");
         let storage = CaptureStorage::new(&db_path).unwrap();
 
-        storage.insert(&create_test_entry(1, "GET", "/api/v1/users", Some(200))).unwrap();
-        storage.insert(&create_test_entry(2, "GET", "/web/home", Some(200))).unwrap();
+        storage
+            .insert(&create_test_entry(1, "GET", "/api/v1/users", Some(200)))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(2, "GET", "/web/home", Some(200)))
+            .unwrap();
 
         let query = CaptureQuery {
             search: Some("/api/".to_string()),
@@ -352,7 +396,14 @@ mod tests {
         let storage = CaptureStorage::new(&db_path).unwrap();
 
         for i in 0..10 {
-            storage.insert(&create_test_entry(i, "GET", &format!("/page/{}", i), Some(200))).unwrap();
+            storage
+                .insert(&create_test_entry(
+                    i,
+                    "GET",
+                    &format!("/page/{}", i),
+                    Some(200),
+                ))
+                .unwrap();
         }
 
         let query = CaptureQuery {
@@ -370,8 +421,12 @@ mod tests {
         let db_path = dir.path().join("test.db");
         let storage = CaptureStorage::new(&db_path).unwrap();
 
-        storage.insert(&create_test_entry(1, "GET", "/test1", Some(200))).unwrap();
-        storage.insert(&create_test_entry(2, "GET", "/test2", Some(200))).unwrap();
+        storage
+            .insert(&create_test_entry(1, "GET", "/test1", Some(200)))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(2, "GET", "/test2", Some(200)))
+            .unwrap();
 
         let before = storage.query(&CaptureQuery::default()).unwrap();
         assert_eq!(before.len(), 2);
@@ -417,8 +472,12 @@ mod tests {
         let storage = CaptureStorage::new(&db_path).unwrap();
 
         // Insert with same ID twice (should replace)
-        storage.insert(&create_test_entry(1, "GET", "/original", Some(200))).unwrap();
-        storage.insert(&create_test_entry(1, "GET", "/updated", Some(201))).unwrap();
+        storage
+            .insert(&create_test_entry(1, "GET", "/original", Some(200)))
+            .unwrap();
+        storage
+            .insert(&create_test_entry(1, "GET", "/updated", Some(201)))
+            .unwrap();
 
         let results = storage.query(&CaptureQuery::default()).unwrap();
         assert_eq!(results.len(), 1);

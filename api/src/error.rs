@@ -49,7 +49,10 @@ impl ApiError {
 
     /// Create a not found error
     pub fn not_found(resource: impl Into<String>) -> Self {
-        Self::new(ErrorCode::NotFound, format!("{} not found", resource.into()))
+        Self::new(
+            ErrorCode::NotFound,
+            format!("{} not found", resource.into()),
+        )
     }
 
     /// Create an internal error

@@ -113,7 +113,10 @@ pub async fn csrf_protection_middleware(
     next: Next,
 ) -> Response {
     // CSRF protection only applies to state-changing methods
-    if !matches!(req.method(), &Method::POST | &Method::PUT | &Method::DELETE | &Method::PATCH) {
+    if !matches!(
+        req.method(),
+        &Method::POST | &Method::PUT | &Method::DELETE | &Method::PATCH
+    ) {
         return next.run(req).await;
     }
 
@@ -125,10 +128,7 @@ pub async fn csrf_protection_middleware(
         .unwrap_or("unknown");
 
     // Get CSRF token from header
-    let provided_token = req
-        .headers()
-        .get(CSRF_HEADER)
-        .and_then(|v| v.to_str().ok());
+    let provided_token = req.headers().get(CSRF_HEADER).and_then(|v| v.to_str().ok());
 
     if let Some(token) = provided_token {
         if csrf.validate_token(client_id, token) {
@@ -153,7 +153,9 @@ pub async fn csrf_protection_middleware(
 
 /// Endpoint to generate CSRF token
 pub async fn generate_csrf_token(
-    axum::extract::Extension(state): axum::extract::Extension<std::sync::Arc<crate::state::AppState>>,
+    axum::extract::Extension(state): axum::extract::Extension<
+        std::sync::Arc<crate::state::AppState>,
+    >,
     req: Request,
 ) -> impl IntoResponse {
     if let Some(ref csrf) = state.csrf_protection {

@@ -295,9 +295,18 @@ mod tests {
     fn test_capture_query_host_filter() {
         let capture = RequestCapture::new(100);
 
-        capture.push(create_test_request("GET", "https://api.example.com/users", true), None);
-        capture.push(create_test_request("GET", "https://other.com/data", true), None);
-        capture.push(create_test_request("GET", "https://api.example.com/posts", true), None);
+        capture.push(
+            create_test_request("GET", "https://api.example.com/users", true),
+            None,
+        );
+        capture.push(
+            create_test_request("GET", "https://other.com/data", true),
+            None,
+        );
+        capture.push(
+            create_test_request("GET", "https://api.example.com/posts", true),
+            None,
+        );
 
         let query = CaptureQuery {
             host: Some("example.com".to_string()),
@@ -340,8 +349,14 @@ mod tests {
         let capture = RequestCapture::new(100);
 
         capture.push(create_test_request("GET", "https://secure.com", true), None);
-        capture.push(create_test_request("GET", "http://insecure.com", false), None);
-        capture.push(create_test_request("GET", "https://another.com", true), None);
+        capture.push(
+            create_test_request("GET", "http://insecure.com", false),
+            None,
+        );
+        capture.push(
+            create_test_request("GET", "https://another.com", true),
+            None,
+        );
 
         let query = CaptureQuery {
             tls: Some(true),
@@ -375,7 +390,10 @@ mod tests {
         let capture = RequestCapture::new(100);
 
         for i in 0..10 {
-            capture.push(create_test_request("GET", &format!("/page/{}", i), false), None);
+            capture.push(
+                create_test_request("GET", &format!("/page/{}", i), false),
+                None,
+            );
         }
 
         let query = CaptureQuery {
