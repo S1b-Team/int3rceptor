@@ -1,5 +1,6 @@
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use time::OffsetDateTime;
 
 /// WebSocket frame types
@@ -68,13 +69,13 @@ impl WsCapture {
             frames_count: 0,
         };
 
-        let mut connections = self.connections.write().unwrap();
+        let mut connections = self.connections.write();
         connections.push(connection);
     }
 
     /// Mark a connection as closed
     pub fn close_connection(&self, id: &str) {
-        let mut connections = self.connections.write().unwrap();
+        let mut connections = self.connections.write();
         if let Some(conn) = connections.iter_mut().find(|c| c.id == id) {
             conn.closed_at = Some(OffsetDateTime::now_utc().unix_timestamp());
         }
@@ -90,7 +91,7 @@ impl WsCapture {
         masked: bool,
     ) -> i64 {
         let frame_id = {
-            let frames = self.frames.read().unwrap();
+            let frames = self.frames.read();
             frames.len() as i64 + 1
         };
 
@@ -104,7 +105,7 @@ impl WsCapture {
             masked,
         };
 
-        let mut frames = self.frames.write().unwrap();
+        let mut frames = self.frames.write();
         frames.push(frame);
 
         // Enforce max frames limit (FIFO)
@@ -113,7 +114,7 @@ impl WsCapture {
         }
 
         // Update connection frame count
-        let mut connections = self.connections.write().unwrap();
+        let mut connections = self.connections.write();
         if let Some(conn) = connections.iter_mut().find(|c| c.id == connection_id) {
             conn.frames_count += 1;
         }
@@ -123,12 +124,12 @@ impl WsCapture {
 
     /// Get all connections
     pub fn get_connections(&self) -> Vec<WsConnection> {
-        self.connections.read().unwrap().clone()
+        self.connections.read().clone()
     }
 
     /// Get frames for a specific connection
     pub fn get_frames(&self, connection_id: &str) -> Vec<WsFrame> {
-        let frames = self.frames.read().unwrap();
+        let frames = self.frames.read();
         frames
             .iter()
             .filter(|f| f.connection_id == connection_id)
@@ -138,13 +139,13 @@ impl WsCapture {
 
     /// Get all frames
     pub fn get_all_frames(&self) -> Vec<WsFrame> {
-        self.frames.read().unwrap().clone()
+        self.frames.read().clone()
     }
 
     /// Clear all captured data
     pub fn clear(&self) {
-        self.connections.write().unwrap().clear();
-        self.frames.write().unwrap().clear();
+        self.connections.write().clear();
+        self.frames.write().clear();
     }
 }
 

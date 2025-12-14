@@ -1,5 +1,8 @@
 use crate::{
-    models::{HeaderPatch, RepeatRequest},
+    models::{
+        AppSettings, HeaderPatch, ManualRequest, ManualResponse, PluginInfo, PluginToggle,
+        RepeatRequest,
+    },
     state::AppState,
 };
 use axum::extract::{Extension, Path, Query};
@@ -14,10 +17,13 @@ use http_body_util::BodyExt;
 use hyper::{Method, Request, Uri};
 use interceptor_core::capture::{CaptureEntry, CaptureQuery, CapturedRequest, CapturedResponse};
 use interceptor_core::connection_pool::ProxyBody;
+use interceptor_core::metrics;
 use interceptor_core::rules::Rule;
+use reqwest::Client;
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
+use std::time::Instant;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 pub fn router() -> Router {
@@ -25,6 +31,10 @@ pub fn router() -> Router {
         .route("/api/requests", get(list_requests).delete(clear_requests))
         .route("/api/requests/:id", get(get_request))
         .route("/api/requests/:id/repeat", post(repeat_request))
+        .route("/api/repeater/send", post(send_manual_request))
+        .route("/api/settings", get(get_settings).put(update_settings))
+        .route("/api/plugins", get(list_plugins))
+        .route("/api/plugins/:name/toggle", post(toggle_plugin))
         .route("/api/requests/export", get(export_requests))
         .route("/api/ca-cert", get(download_ca_cert))
         .route(
@@ -37,9 +47,37 @@ pub fn router() -> Router {
             "/api/intruder/results",
             get(intruder_results).delete(intruder_clear),
         )
+        .route("/api/intruder/start", post(intruder_start))
+        .route("/api/intruder/stop", post(intruder_stop))
         .route("/api/websocket/connections", get(ws_connections))
         .route("/api/websocket/frames/:connection_id", get(ws_frames))
         .route("/api/websocket/clear", delete(ws_clear))
+        // Metrics and monitoring
+        .route("/api/metrics", get(get_metrics))
+        .route("/api/metrics/reset", post(reset_metrics))
+        .route("/api/health", get(health_check))
+        // Security management routes
+        .route(
+            "/api/security/ip-filter",
+            get(crate::security_routes::get_ip_filter_config)
+                .put(crate::security_routes::set_ip_filter_config),
+        )
+        .route(
+            "/api/security/ip-filter/allow",
+            post(crate::security_routes::add_allowed_ip),
+        )
+        .route(
+            "/api/security/ip-filter/block",
+            post(crate::security_routes::add_blocked_ip),
+        )
+        .route(
+            "/api/security/audit-log/info",
+            get(crate::security_routes::get_audit_log_info),
+        )
+        .route(
+            "/api/security/audit-log/rotate",
+            post(crate::security_routes::rotate_audit_log),
+        )
 }
 
 async fn list_requests(
@@ -388,6 +426,25 @@ async fn intruder_clear(Extension(state): Extension<Arc<AppState>>) -> impl Into
     StatusCode::NO_CONTENT
 }
 
+async fn intruder_start(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(req): Json<IntruderGenerateRequest>,
+) -> impl IntoResponse {
+    match state
+        .intruder
+        .start_attack(req.template, req.config, state.pool.clone())
+        .await
+    {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn intruder_stop(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    state.intruder.stop_attack();
+    StatusCode::OK
+}
+
 #[derive(Deserialize)]
 struct IntruderGenerateRequest {
     template: String,
@@ -409,4 +466,128 @@ async fn ws_frames(
 async fn ws_clear(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
     state.ws_capture.clear();
     StatusCode::NO_CONTENT
+}
+
+// Metrics handlers
+async fn get_metrics() -> impl IntoResponse {
+    let snapshot = metrics::metrics().snapshot();
+    Json(snapshot)
+}
+
+async fn reset_metrics() -> impl IntoResponse {
+    metrics::metrics().reset();
+    StatusCode::NO_CONTENT
+}
+
+async fn health_check(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    let m = metrics::metrics().snapshot();
+    Json(json!({
+        "status": "healthy",
+        "uptime_secs": m.uptime_secs,
+        "connections_active": m.connections_active,
+        "requests_total": m.requests_total,
+        "capture_count": state.capture.len(),
+    }))
+}
+
+async fn send_manual_request(Json(payload): Json<ManualRequest>) -> impl IntoResponse {
+    let client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap_or_default();
+
+    let method = match payload.method.parse::<reqwest::Method>() {
+        Ok(m) => m,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    let start = Instant::now();
+
+    let mut req_builder = client.request(method, &payload.url);
+
+    if let Some(headers) = payload.headers {
+        for (k, v) in headers {
+            req_builder = req_builder.header(k, v);
+        }
+    }
+
+    if let Some(body) = payload.body {
+        req_builder = req_builder.body(body);
+    }
+
+    match req_builder.send().await {
+        Ok(res) => {
+            let status = res.status().as_u16();
+            let status_text = res.status().canonical_reason().unwrap_or("").to_string();
+
+            let mut headers = std::collections::HashMap::new();
+            for (k, v) in res.headers() {
+                headers.insert(k.to_string(), v.to_str().unwrap_or("").to_string());
+            }
+
+            let body_bytes = res.bytes().await.unwrap_or_default();
+            let size_bytes = body_bytes.len();
+            let body = String::from_utf8_lossy(&body_bytes).to_string();
+            let time_ms = start.elapsed().as_millis() as u64;
+
+            Json(ManualResponse {
+                status,
+                status_text,
+                headers,
+                body,
+                time_ms,
+                size_bytes,
+            })
+            .into_response()
+        }
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("Request failed: {}", e)).into_response(),
+    }
+}
+
+async fn get_settings(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    let settings = state.settings.read().await;
+    Json(settings.clone())
+}
+
+async fn update_settings(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(new_settings): Json<AppSettings>,
+) -> impl IntoResponse {
+    let mut settings = state.settings.write().await;
+    *settings = new_settings;
+    Json(settings.clone())
+}
+
+async fn list_plugins(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    let plugins = state.plugin_manager.list_plugins();
+    let mut plugin_infos = Vec::new();
+
+    for name in plugins {
+        plugin_infos.push(PluginInfo {
+            name: name.clone(),
+            version: "1.0.0".to_string(),
+            enabled: state.plugin_manager.is_loaded(&name),
+            description: "WASM Plugin".to_string(),
+        });
+    }
+
+    Json(plugin_infos)
+}
+
+async fn toggle_plugin(
+    Path(name): Path<String>,
+    Extension(state): Extension<Arc<AppState>>,
+    Json(payload): Json<PluginToggle>,
+) -> impl IntoResponse {
+    if payload.enabled {
+        match state.plugin_manager.reload_plugin(&name) {
+            Ok(_) => StatusCode::OK.into_response(),
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        }
+    } else {
+        match state.plugin_manager.unload_plugin(&name) {
+            Ok(_) => StatusCode::OK.into_response(),
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        }
+    }
 }

@@ -42,11 +42,30 @@ impl TlsInterceptor {
         let mut config = rustls::ServerConfig::builder()
             .with_no_client_auth()
             .with_cert_resolver(resolver);
-        config.alpn_protocols = vec![b"http/1.1".to_vec(), b"h2".to_vec()];
+
+        // Configure ALPN to prefer HTTP/2 over HTTP/1.1
+        // Most modern clients support HTTP/2, so we advertise it first
+        config.alpn_protocols = vec![
+            b"h2".to_vec(),       // HTTP/2 (preferred)
+            b"http/1.1".to_vec(), // HTTP/1.1 (fallback)
+        ];
+
         let acceptor = TlsAcceptor::from(Arc::new(config));
         Ok(Self {
             cert_manager,
             acceptor,
         })
+    }
+
+    /// Get the negotiated ALPN protocol from the TLS connection
+    /// Returns Some("h2") for HTTP/2 or Some("http/1.1") for HTTP/1.1
+    pub fn get_alpn_protocol(
+        stream: &tokio_rustls::server::TlsStream<impl tokio::io::AsyncRead + tokio::io::AsyncWrite>,
+    ) -> Option<String> {
+        stream
+            .get_ref()
+            .1
+            .alpn_protocol()
+            .and_then(|proto| String::from_utf8(proto.to_vec()).ok())
     }
 }

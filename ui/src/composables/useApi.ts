@@ -1,14 +1,14 @@
-import axios from "axios";
 import type {
     CaptureEntry,
     HeaderField,
-    ReplayResult,
-    Rule,
-    ScopeConfig,
     IntruderGenerateRequest,
     IntruderGenerateResponse,
     IntruderResult,
+    ReplayResult,
+    Rule,
+    ScopeConfig,
 } from "@/types";
+import axios from "axios";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL ?? "http://127.0.0.1:3000",
@@ -101,6 +101,16 @@ export function useApi() {
         await api.delete("/api/intruder/results");
     };
 
+    const intruderStart = async (
+        request: IntruderGenerateRequest
+    ): Promise<void> => {
+        await api.post("/api/intruder/start", request);
+    };
+
+    const intruderStop = async (): Promise<void> => {
+        await api.post("/api/intruder/stop");
+    };
+
     return {
         listRequests,
         clearRequests,
@@ -114,6 +124,8 @@ export function useApi() {
         intruderGenerate,
         intruderResults,
         intruderClear,
+        intruderStart,
+        intruderStop,
     };
 }
 

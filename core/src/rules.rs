@@ -1,7 +1,8 @@
+use parking_lot::RwLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RuleType {
@@ -59,27 +60,24 @@ impl RuleEngine {
     }
 
     pub fn add_rule(&self, rule: Rule) {
-        let mut rules = self.rules.write().unwrap();
-        rules.push(rule);
+        self.rules.write().push(rule);
     }
 
     pub fn get_rules(&self) -> Vec<Rule> {
-        self.rules.read().unwrap().clone()
+        self.rules.read().clone()
     }
 
     pub fn clear_rules(&self) {
-        let mut rules = self.rules.write().unwrap();
-        rules.clear();
+        self.rules.write().clear();
         // Also clear regex cache
-        let mut cache = self.regex_cache.write().unwrap();
-        cache.clear();
+        self.regex_cache.write().clear();
     }
 
     /// Get or compile a regex pattern (with caching)
     fn get_regex(&self, pattern: &str) -> Option<Regex> {
         // Check cache first
         {
-            let cache = self.regex_cache.read().unwrap();
+            let cache = self.regex_cache.read();
             if let Some(regex) = cache.get(pattern) {
                 return Some(regex.clone());
             }
@@ -88,8 +86,9 @@ impl RuleEngine {
         // Compile and cache
         match Regex::new(pattern) {
             Ok(regex) => {
-                let mut cache = self.regex_cache.write().unwrap();
-                cache.insert(pattern.to_string(), regex.clone());
+                self.regex_cache
+                    .write()
+                    .insert(pattern.to_string(), regex.clone());
                 Some(regex)
             }
             Err(e) => {
@@ -100,7 +99,7 @@ impl RuleEngine {
     }
 
     pub fn apply_request_rules(&self, parts: &mut http::request::Parts, body: &mut Vec<u8>) {
-        let rules = self.rules.read().unwrap();
+        let rules = self.rules.read();
         for rule in rules.iter() {
             if !rule.active || rule.rule_type != RuleType::Request {
                 continue;
@@ -113,7 +112,7 @@ impl RuleEngine {
     }
 
     pub fn apply_response_rules(&self, parts: &mut http::response::Parts, body: &mut Vec<u8>) {
-        let rules = self.rules.read().unwrap();
+        let rules = self.rules.read();
         for rule in rules.iter() {
             if !rule.active || rule.rule_type != RuleType::Response {
                 continue;
@@ -206,10 +205,9 @@ impl RuleEngine {
 
                 // Update Content-Length if present
                 if headers.contains_key(http::header::CONTENT_LENGTH) {
-                    headers.insert(
-                        http::header::CONTENT_LENGTH,
-                        body.len().to_string().parse().unwrap(),
-                    );
+                    if let Ok(val) = http::HeaderValue::from_str(&body.len().to_string()) {
+                        headers.insert(http::header::CONTENT_LENGTH, val);
+                    }
                 }
             }
             Action::RegexReplaceBody(pattern, replacement) => {
@@ -220,10 +218,9 @@ impl RuleEngine {
 
                     // Update Content-Length if present
                     if headers.contains_key(http::header::CONTENT_LENGTH) {
-                        headers.insert(
-                            http::header::CONTENT_LENGTH,
-                            body.len().to_string().parse().unwrap(),
-                        );
+                        if let Ok(val) = http::HeaderValue::from_str(&body.len().to_string()) {
+                            headers.insert(http::header::CONTENT_LENGTH, val);
+                        }
                     }
                 }
             }
@@ -264,5 +261,260 @@ impl RuleEngine {
 impl Default for RuleEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_rule(id: &str, condition: MatchCondition, action: Action) -> Rule {
+        Rule {
+            id: id.to_string(),
+            active: true,
+            rule_type: RuleType::Request,
+            condition,
+            action,
+        }
+    }
+
+    #[test]
+    fn test_add_and_get_rules() {
+        let engine = RuleEngine::new();
+        let rule = create_test_rule(
+            "test1",
+            MatchCondition::UrlContains("/api".to_string()),
+            Action::SetHeader("X-Test".to_string(), "value".to_string()),
+        );
+
+        engine.add_rule(rule);
+        let rules = engine.get_rules();
+
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].id, "test1");
+    }
+
+    #[test]
+    fn test_clear_rules() {
+        let engine = RuleEngine::new();
+        engine.add_rule(create_test_rule(
+            "r1",
+            MatchCondition::UrlContains("/test".to_string()),
+            Action::RemoveHeader("X-Remove".to_string()),
+        ));
+        engine.add_rule(create_test_rule(
+            "r2",
+            MatchCondition::BodyContains("secret".to_string()),
+            Action::ReplaceBody("secret".to_string(), "***".to_string()),
+        ));
+
+        assert_eq!(engine.get_rules().len(), 2);
+        engine.clear_rules();
+        assert_eq!(engine.get_rules().len(), 0);
+    }
+
+    #[test]
+    fn test_regex_caching() {
+        let engine = RuleEngine::new();
+        let pattern = r"\d{3}-\d{4}";
+
+        // First call compiles and caches
+        let regex1 = engine.get_regex(pattern);
+        assert!(regex1.is_some());
+
+        // Second call should use cache
+        let regex2 = engine.get_regex(pattern);
+        assert!(regex2.is_some());
+
+        // Both should work the same
+        assert!(regex1.unwrap().is_match("123-4567"));
+    }
+
+    #[test]
+    fn test_invalid_regex_returns_none() {
+        let engine = RuleEngine::new();
+        let invalid_pattern = r"[invalid(";
+
+        let result = engine.get_regex(invalid_pattern);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_body_replace_action() {
+        let engine = RuleEngine::new();
+        engine.add_rule(create_test_rule(
+            "replace",
+            MatchCondition::BodyContains("password".to_string()),
+            Action::ReplaceBody("password".to_string(), "********".to_string()),
+        ));
+
+        let mut body = b"my password is secret".to_vec();
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::CONTENT_LENGTH,
+            http::HeaderValue::from_static("21"),
+        );
+
+        // Create minimal request parts
+        let (mut parts, _) = http::Request::builder()
+            .uri("/api/login")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        engine.apply_request_rules(&mut parts, &mut body);
+
+        let body_str = String::from_utf8_lossy(&body);
+        assert!(body_str.contains("********"));
+        assert!(!body_str.contains("password"));
+    }
+
+    #[test]
+    fn test_url_contains_condition() {
+        let engine = RuleEngine::new();
+        engine.add_rule(create_test_rule(
+            "api-rule",
+            MatchCondition::UrlContains("/api/v1".to_string()),
+            Action::SetHeader("X-API-Version".to_string(), "1".to_string()),
+        ));
+
+        let mut body = vec![];
+
+        // Matching URL
+        let (mut parts, _) = http::Request::builder()
+            .uri("/api/v1/users")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        engine.apply_request_rules(&mut parts, &mut body);
+        assert!(parts.headers.contains_key("x-api-version"));
+
+        // Non-matching URL
+        let (mut parts2, _) = http::Request::builder()
+            .uri("/web/home")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        engine.apply_request_rules(&mut parts2, &mut body);
+        assert!(!parts2.headers.contains_key("x-api-version"));
+    }
+
+    #[test]
+    fn test_url_regex_condition() {
+        let engine = RuleEngine::new();
+        engine.add_rule(create_test_rule(
+            "user-id-rule",
+            MatchCondition::UrlRegex(r"/users/\d+".to_string()),
+            Action::SetHeader("X-Has-User-Id".to_string(), "true".to_string()),
+        ));
+
+        let mut body = vec![];
+
+        // Matching URL with numeric ID
+        let (mut parts, _) = http::Request::builder()
+            .uri("/users/12345")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        engine.apply_request_rules(&mut parts, &mut body);
+        assert!(parts.headers.contains_key("x-has-user-id"));
+
+        // Non-matching URL (no numeric ID)
+        let (mut parts2, _) = http::Request::builder()
+            .uri("/users/me")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        engine.apply_request_rules(&mut parts2, &mut body);
+        assert!(!parts2.headers.contains_key("x-has-user-id"));
+    }
+
+    #[test]
+    fn test_inactive_rule_not_applied() {
+        let engine = RuleEngine::new();
+        let mut rule = create_test_rule(
+            "inactive",
+            MatchCondition::UrlContains("/test".to_string()),
+            Action::SetHeader("X-Should-Not-Exist".to_string(), "value".to_string()),
+        );
+        rule.active = false;
+        engine.add_rule(rule);
+
+        let mut body = vec![];
+        let (mut parts, _) = http::Request::builder()
+            .uri("/test/path")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        engine.apply_request_rules(&mut parts, &mut body);
+        assert!(!parts.headers.contains_key("x-should-not-exist"));
+    }
+
+    #[test]
+    fn test_regex_replace_body() {
+        let engine = RuleEngine::new();
+        engine.add_rule(create_test_rule(
+            "redact-ssn",
+            MatchCondition::BodyRegex(r"\d{3}-\d{2}-\d{4}".to_string()),
+            Action::RegexReplaceBody(r"\d{3}-\d{2}-\d{4}".to_string(), "XXX-XX-XXXX".to_string()),
+        ));
+
+        let mut body = b"SSN: 123-45-6789".to_vec();
+        let (mut parts, _) = http::Request::builder()
+            .uri("/submit")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        engine.apply_request_rules(&mut parts, &mut body);
+
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(body_str, "SSN: XXX-XX-XXXX");
+    }
+
+    #[test]
+    fn test_remove_header_action() {
+        let engine = RuleEngine::new();
+        engine.add_rule(create_test_rule(
+            "remove-auth",
+            MatchCondition::UrlContains("/public".to_string()),
+            Action::RemoveHeader("authorization".to_string()),
+        ));
+
+        let mut body = vec![];
+        let (mut parts, _) = http::Request::builder()
+            .uri("/public/resource")
+            .header("authorization", "Bearer secret-token")
+            .body(())
+            .unwrap()
+            .into_parts();
+
+        assert!(parts.headers.contains_key("authorization"));
+        engine.apply_request_rules(&mut parts, &mut body);
+        assert!(!parts.headers.contains_key("authorization"));
+    }
+
+    #[test]
+    fn test_thread_safety() {
+        use std::thread;
+
+        let engine = RuleEngine::new();
+        let engine_clone = engine.clone();
+
+        let handle = thread::spawn(move || {
+            engine_clone.add_rule(create_test_rule(
+                "thread-rule",
+                MatchCondition::UrlContains("/thread".to_string()),
+                Action::SetHeader("X-Thread".to_string(), "1".to_string()),
+            ));
+        });
+
+        handle.join().unwrap();
+        assert_eq!(engine.get_rules().len(), 1);
     }
 }

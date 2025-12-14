@@ -1,0 +1,19 @@
+[package]
+name = "example-logger"
+version = "0.1.0"
+edition = "2021"
+
+# This prevents the plugin from being part of the parent workspace
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# No external dependencies needed for this simple example
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Enable link-time optimization
+strip = true        # Strip symbols
+panic = "abort"     # Smaller binary

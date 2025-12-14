@@ -89,15 +89,38 @@
           </div>
         </section>
 
+        <section class="options-section">
+          <h3>5. Options</h3>
+          <div class="options-grid">
+            <div class="option-item">
+              <label>Concurrency</label>
+              <input type="number" v-model.number="concurrency" min="1" max="100" />
+            </div>
+            <div class="option-item">
+              <label>Delay (ms)</label>
+              <input type="number" v-model.number="delay" min="0" />
+            </div>
+          </div>
+        </section>
+
         <section class="launch-section">
-          <button
-            @click="generateAttack"
-            :disabled="!canGenerate || generating"
-            class="btn-primary btn-large"
-          >
-            <span v-if="generating">⏳ Generating...</span>
-            <span v-else>🚀 Generate Attack ({{ estimatedRequests }} requests)</span>
-          </button>
+          <div class="launch-actions">
+            <button
+              @click="startAttack"
+              :disabled="!canGenerate || running"
+              class="btn-primary btn-large"
+            >
+              <span v-if="running">🚀 Attack Running...</span>
+              <span v-else>🚀 Start Attack ({{ estimatedRequests }} requests)</span>
+            </button>
+            <button
+              v-if="running"
+              @click="stopAttack"
+              class="btn-danger btn-large"
+            >
+              🛑 Stop Attack
+            </button>
+          </div>
         </section>
       </div>
 
@@ -175,18 +198,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
 import { useApi } from '@/composables/useApi';
 import type { AttackType, IntruderConfig, IntruderResult } from '@/types';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-const { intruderGenerate, intruderResults, intruderClear } = useApi();
+const { intruderGenerate, intruderResults, intruderClear, intruderStart, intruderStop } = useApi();
 
 const template = ref('');
 const payloadsText = ref('');
 const attackType = ref<AttackType>('Sniper');
-const generating = ref(false);
+const running = ref(false);
 const results = ref<IntruderResult[]>([]);
 const generatedRequests = ref<string[]>([]);
+const concurrency = ref(1);
+const delay = ref(0);
+const pollingInterval = ref<number | null>(null);
 
 const attackTypes = [
   {
@@ -261,30 +287,69 @@ const canGenerate = computed(() => {
   );
 });
 
-const generateAttack = async () => {
+const startAttack = async () => {
   if (!canGenerate.value) return;
 
-  generating.value = true;
+  running.value = true;
   generatedRequests.value = [];
+  results.value = [];
 
   try {
     const config: IntruderConfig = {
       positions: detectedPositions.value,
       payloads: payloadsList.value,
       attack_type: attackType.value,
+      options: {
+        concurrency: concurrency.value,
+        delay_ms: delay.value,
+      },
     };
 
-    const response = await intruderGenerate({
+    // First generate preview (optional, but good for UI)
+    try {
+      const preview = await intruderGenerate({ template: template.value, config });
+      generatedRequests.value = preview.requests;
+    } catch (e) {
+      console.warn("Failed to generate preview", e);
+    }
+
+    await intruderStart({
       template: template.value,
       config,
     });
 
-    generatedRequests.value = response.requests;
+    // Start polling
+    startPolling();
   } catch (error) {
-    console.error('Failed to generate attack:', error);
-    alert('Failed to generate attack. Check console for details.');
+    console.error('Failed to start attack:', error);
+    alert('Failed to start attack. Check console for details.');
+    running.value = false;
+  }
+};
+
+const stopAttack = async () => {
+  try {
+    await intruderStop();
+  } catch (error) {
+    console.error('Failed to stop attack:', error);
   } finally {
-    generating.value = false;
+    stopPolling();
+    running.value = false;
+  }
+};
+
+const startPolling = () => {
+  if (pollingInterval.value) clearInterval(pollingInterval.value);
+  pollingInterval.value = window.setInterval(async () => {
+    await refreshResults();
+    // TODO: Check if attack finished from backend status
+  }, 500);
+};
+
+const stopPolling = () => {
+  if (pollingInterval.value) {
+    clearInterval(pollingInterval.value);
+    pollingInterval.value = null;
   }
 };
 
@@ -361,6 +426,10 @@ const formatBytes = (bytes: number) => {
 
 onMounted(() => {
   refreshResults();
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 
@@ -790,5 +859,51 @@ h3 {
   text-align: center;
   color: #64748b;
   font-style: italic;
+}
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.option-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.option-item label {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.option-item input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 0.5rem;
+  border-radius: 4px;
+  color: #e2e8f0;
+}
+
+.launch-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 1rem 1.5rem;
+  font-size: 1.1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #f87171;
 }
 </style>

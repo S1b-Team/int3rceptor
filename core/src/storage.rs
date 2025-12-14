@@ -194,3 +194,247 @@ fn clamp_i128(value: i128) -> i64 {
 fn clamp_u128(value: u128) -> i64 {
     min(value, i64::MAX as u128) as i64
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn create_test_entry(id: u64, method: &str, url: &str, status: Option<u16>) -> CaptureEntry {
+        let request = CapturedRequest {
+            id,
+            timestamp_ms: 1700000000000,
+            method: method.to_string(),
+            url: url.to_string(),
+            headers: vec![("host".to_string(), "test.com".to_string())],
+            body: b"request body".to_vec(),
+            tls: url.starts_with("https"),
+        };
+
+        let response = status.map(|s| CapturedResponse {
+            request_id: id,
+            status_code: s,
+            headers: vec![("content-type".to_string(), "text/plain".to_string())],
+            body: b"response body".to_vec(),
+            duration_ms: 100,
+        });
+
+        CaptureEntry { request, response }
+    }
+
+    #[test]
+    fn test_storage_create_and_init() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+
+        let storage = CaptureStorage::new(&db_path);
+        assert!(storage.is_ok());
+        assert!(db_path.exists());
+    }
+
+    #[test]
+    fn test_storage_insert_and_query() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        let entry = create_test_entry(1, "GET", "https://api.test.com/users", Some(200));
+        storage.insert(&entry).unwrap();
+
+        let results = storage.query(&CaptureQuery::default()).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].request.method, "GET");
+        assert_eq!(results[0].request.url, "https://api.test.com/users");
+        assert_eq!(results[0].response.as_ref().unwrap().status_code, 200);
+    }
+
+    #[test]
+    fn test_storage_query_by_method() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        storage.insert(&create_test_entry(1, "GET", "/api/users", Some(200))).unwrap();
+        storage.insert(&create_test_entry(2, "POST", "/api/users", Some(201))).unwrap();
+        storage.insert(&create_test_entry(3, "GET", "/api/posts", Some(200))).unwrap();
+
+        let query = CaptureQuery {
+            method: Some("GET".to_string()),
+            ..Default::default()
+        };
+
+        let results = storage.query(&query).unwrap();
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().all(|e| e.request.method == "GET"));
+    }
+
+    #[test]
+    fn test_storage_query_by_host() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        storage.insert(&create_test_entry(1, "GET", "https://api.example.com/users", Some(200))).unwrap();
+        storage.insert(&create_test_entry(2, "GET", "https://other.com/data", Some(200))).unwrap();
+
+        let query = CaptureQuery {
+            host: Some("example.com".to_string()),
+            ..Default::default()
+        };
+
+        let results = storage.query(&query).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].request.url.contains("example.com"));
+    }
+
+    #[test]
+    fn test_storage_query_by_status() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        storage.insert(&create_test_entry(1, "GET", "/success", Some(200))).unwrap();
+        storage.insert(&create_test_entry(2, "GET", "/error", Some(500))).unwrap();
+        storage.insert(&create_test_entry(3, "GET", "/not-found", Some(404))).unwrap();
+
+        let query = CaptureQuery {
+            status: Some(200),
+            ..Default::default()
+        };
+
+        let results = storage.query(&query).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].response.as_ref().unwrap().status_code, 200);
+    }
+
+    #[test]
+    fn test_storage_query_by_tls() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        storage.insert(&create_test_entry(1, "GET", "https://secure.com", Some(200))).unwrap();
+        storage.insert(&create_test_entry(2, "GET", "http://insecure.com", Some(200))).unwrap();
+
+        let query = CaptureQuery {
+            tls: Some(true),
+            ..Default::default()
+        };
+
+        let results = storage.query(&query).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].request.tls);
+    }
+
+    #[test]
+    fn test_storage_query_with_search() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        storage.insert(&create_test_entry(1, "GET", "/api/v1/users", Some(200))).unwrap();
+        storage.insert(&create_test_entry(2, "GET", "/web/home", Some(200))).unwrap();
+
+        let query = CaptureQuery {
+            search: Some("/api/".to_string()),
+            ..Default::default()
+        };
+
+        let results = storage.query(&query).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].request.url.contains("/api/"));
+    }
+
+    #[test]
+    fn test_storage_query_with_limit() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        for i in 0..10 {
+            storage.insert(&create_test_entry(i, "GET", &format!("/page/{}", i), Some(200))).unwrap();
+        }
+
+        let query = CaptureQuery {
+            limit: Some(3),
+            ..Default::default()
+        };
+
+        let results = storage.query(&query).unwrap();
+        assert_eq!(results.len(), 3);
+    }
+
+    #[test]
+    fn test_storage_clear() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        storage.insert(&create_test_entry(1, "GET", "/test1", Some(200))).unwrap();
+        storage.insert(&create_test_entry(2, "GET", "/test2", Some(200))).unwrap();
+
+        let before = storage.query(&CaptureQuery::default()).unwrap();
+        assert_eq!(before.len(), 2);
+
+        storage.clear().unwrap();
+
+        let after = storage.query(&CaptureQuery::default()).unwrap();
+        assert_eq!(after.len(), 0);
+    }
+
+    #[test]
+    fn test_storage_entry_without_response() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        let entry = create_test_entry(1, "GET", "/pending", None);
+        storage.insert(&entry).unwrap();
+
+        let results = storage.query(&CaptureQuery::default()).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].response.is_none());
+    }
+
+    #[test]
+    fn test_storage_preserves_body_data() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        let entry = create_test_entry(1, "POST", "/data", Some(200));
+        storage.insert(&entry).unwrap();
+
+        let results = storage.query(&CaptureQuery::default()).unwrap();
+        assert_eq!(results[0].request.body, b"request body");
+        assert_eq!(results[0].response.as_ref().unwrap().body, b"response body");
+    }
+
+    #[test]
+    fn test_storage_upsert_same_id() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let storage = CaptureStorage::new(&db_path).unwrap();
+
+        // Insert with same ID twice (should replace)
+        storage.insert(&create_test_entry(1, "GET", "/original", Some(200))).unwrap();
+        storage.insert(&create_test_entry(1, "GET", "/updated", Some(201))).unwrap();
+
+        let results = storage.query(&CaptureQuery::default()).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].request.url, "/updated");
+        assert_eq!(results[0].response.as_ref().unwrap().status_code, 201);
+    }
+
+    #[test]
+    fn test_clamp_functions() {
+        // Test clamp_i128
+        assert_eq!(clamp_i128(100), 100);
+        assert_eq!(clamp_i128(i64::MAX as i128 + 1), i64::MAX);
+        assert_eq!(clamp_i128(i64::MIN as i128 - 1), i64::MIN);
+
+        // Test clamp_u128
+        assert_eq!(clamp_u128(100), 100);
+        assert_eq!(clamp_u128(i64::MAX as u128 + 1), i64::MAX);
+    }
+}

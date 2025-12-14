@@ -16,6 +16,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 anyhow.workspace = true
 axum.workspace = true
+uuid = { version = "1.6", features = ["v4"] }
 
 [build-dependencies]
 chrono = "0.4"

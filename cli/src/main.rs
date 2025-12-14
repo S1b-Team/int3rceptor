@@ -12,7 +12,13 @@
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
 use clap::Parser;
+use interceptor_api::audit::AuditLogger;
+use interceptor_api::csrf::CsrfProtection;
+use interceptor_api::ip_filter::{IpFilter, IpFilterConfig};
+use interceptor_api::models::{AppSettings, ProxyConfig, UiConfig};
 use interceptor_core::connection_pool::ConnectionPool;
+use interceptor_core::plugin::config::PluginSystemConfig;
+use interceptor_core::plugin::manager::PluginManager;
 use interceptor_core::proxy::ProxyServer;
 use interceptor_core::tls::TlsInterceptor;
 use interceptor_core::{
@@ -22,6 +28,7 @@ use interceptor_core::{
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::info;
 
 // Build-time watermark - DO NOT REMOVE
@@ -119,6 +126,58 @@ async fn main() -> anyhow::Result<()> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(64);
 
+    // Initialize audit logging
+    let audit_logger = if let Ok(audit_path) = std::env::var("AUDIT_LOG_PATH") {
+        match AuditLogger::new(&audit_path) {
+            Ok(logger) => {
+                info!("Audit logging enabled: {}", audit_path);
+                Some(Arc::new(logger))
+            }
+            Err(e) => {
+                tracing::warn!("Failed to initialize audit logger: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Initialize CSRF protection
+    let csrf_protection = if std::env::var("CSRF_PROTECTION")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false)
+    {
+        let secret =
+            std::env::var("CSRF_SECRET").unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+        info!("CSRF protection enabled");
+        Some(Arc::new(CsrfProtection::new(secret)))
+    } else {
+        None
+    };
+
+    // Initialize IP filtering
+    let ip_filter = Arc::new(IpFilter::new(IpFilterConfig::default()));
+
+    let settings = Arc::new(RwLock::new(AppSettings {
+        proxy: ProxyConfig {
+            port: cli.listen.port(),
+            host: cli.listen.ip().to_string(),
+            intercept_https: true,
+            http2: true,
+        },
+        ui: UiConfig {
+            theme: "cyberpunk".to_string(),
+            animations: true,
+            notifications: true,
+        },
+    }));
+
+    let plugin_manager = Arc::new(PluginManager::new(PluginSystemConfig::default()));
+    // Try to load plugins from default directory
+    if let Err(e) = plugin_manager.load_all() {
+        tracing::warn!("Failed to load plugins: {}", e);
+    }
+
     if let Some(path) = cli.export_ca.as_ref() {
         cert_manager.export_ca_cert(path)?;
         println!("CA certificate exported to {}", path.display());
@@ -136,6 +195,11 @@ async fn main() -> anyhow::Result<()> {
         api_token,
         max_body_bytes,
         max_concurrency,
+        audit_logger,
+        csrf_protection,
+        ip_filter,
+        settings,
+        plugin_manager: plugin_manager.clone(),
     };
     let api_addr = cli.api;
     let api_task = tokio::spawn(async move { interceptor_api::serve(api_state, api_addr).await });
@@ -146,6 +210,7 @@ async fn main() -> anyhow::Result<()> {
         rules.clone(),
         scope.clone(),
         Some(tls),
+        Some(plugin_manager),
     );
     let proxy_task = tokio::spawn(async move { proxy.run().await });
 

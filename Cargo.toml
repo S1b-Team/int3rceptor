@@ -1,5 +1,6 @@
 [workspace]
 members = ["core", "api", "cli", "tools/license-gen"]
+exclude = ["plugins/*", "desktop/src-tauri"]
 resolver = "2"
 
 [workspace.package]

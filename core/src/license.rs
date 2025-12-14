@@ -75,7 +75,7 @@ impl License {
         if let Some(expires_at) = self.expires_at {
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .expect("system time before UNIX epoch")
                 .as_secs();
             if now > expires_at {
                 return false;
@@ -99,7 +99,7 @@ impl License {
         self.expires_at.map(|expires_at| {
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .expect("system time before UNIX epoch")
                 .as_secs();
             if expires_at > now {
                 (expires_at - now) / 86400
