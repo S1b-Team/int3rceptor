@@ -55,6 +55,8 @@ pub enum PatternType {
     NotContains(String),
     /// Header should match regex
     Regex(String),
+    /// Header should NOT match regex
+    NotRegex(String),
 }
 
 impl DetectionRule {
@@ -129,6 +131,16 @@ impl DetectionRule {
                                 .as_ref()
                                 .map(|v| !re.is_match(v))
                                 .unwrap_or(true)
+                        } else {
+                            false
+                        }
+                    }
+                    PatternType::NotRegex(pattern) => {
+                        if let Ok(re) = regex::Regex::new(pattern) {
+                            header_value
+                                .as_ref()
+                                .map(|v| re.is_match(v))
+                                .unwrap_or(false)
                         } else {
                             false
                         }
@@ -354,7 +366,7 @@ impl DetectionRule {
                 response_patterns: vec![],
                 header_patterns: vec![HeaderPattern {
                     header_name: "Server".to_string(),
-                    pattern: PatternType::Regex(r"(Apache|nginx|IIS|Express)/[\d\.]+".to_string()),
+                    pattern: PatternType::NotRegex(r"(Apache|nginx|IIS|Express)/[\d\.]+".to_string()),
                     message: "Server version is disclosed in headers".to_string(),
                 }],
                 active_payloads: vec![],

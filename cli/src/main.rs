@@ -186,6 +186,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let project_manager = Arc::new(ProjectManager::new(Some(storage.clone())));
+    let scanner = Arc::new(Scanner::new());
 
     let api_state = interceptor_api::state::AppState {
         capture: capture.clone(),
@@ -194,7 +195,7 @@ async fn main() -> anyhow::Result<()> {
         rules: rules.clone(),
         scope: scope.clone(),
         intruder: intruder.clone(),
-        scanner: Arc::new(Scanner::new()),
+        scanner: scanner.clone(),
         ws_capture: ws_capture.clone(),
         project_manager,
         api_token,
@@ -216,6 +217,7 @@ async fn main() -> anyhow::Result<()> {
         scope.clone(),
         Some(tls),
         Some(plugin_manager),
+        Some(scanner),
     );
     let proxy_task = tokio::spawn(async move { proxy.run().await });
 

@@ -3,12 +3,12 @@ use crate::connection_pool::{ConnectionPool, ProxyBody};
 use crate::error::{ProxyError, Result};
 use crate::metrics::metrics;
 use crate::rules::RuleEngine;
+use crate::scanner::Scanner;
 use crate::scope::ScopeManager;
 use crate::tls::TlsInterceptor;
 use http_body_util::BodyExt;
 use hyper::body::{Bytes, Incoming};
 use hyper::header::{HeaderMap, HOST};
-
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, Uri};
 use hyper_util::rt::{TokioExecutor, TokioIo};
@@ -24,6 +24,8 @@ use tracing::{debug, info, info_span, warn, Instrument};
 /// Request ID counter for correlation
 static REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+// ...
+
 #[derive(Clone)]
 pub struct ProxyServer {
     addr: SocketAddr,
@@ -33,6 +35,7 @@ pub struct ProxyServer {
     scope: Arc<ScopeManager>,
     tls: Option<Arc<TlsInterceptor>>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
+    scanner: Option<Arc<Scanner>>,
 }
 
 impl ProxyServer {
@@ -43,6 +46,7 @@ impl ProxyServer {
         scope: Arc<ScopeManager>,
         tls: Option<Arc<TlsInterceptor>>,
         plugins: Option<Arc<crate::plugin::PluginManager>>,
+        scanner: Option<Arc<Scanner>>,
     ) -> Self {
         Self {
             addr,
@@ -52,6 +56,7 @@ impl ProxyServer {
             scope,
             tls,
             plugins,
+            scanner,
         }
     }
 
@@ -64,6 +69,7 @@ impl ProxyServer {
         let scope = self.scope.clone();
         let tls = self.tls.clone();
         let plugins = self.plugins.clone();
+        let scanner = self.scanner.clone();
 
         loop {
             let (stream, peer) = listener.accept().await?;
@@ -78,6 +84,7 @@ impl ProxyServer {
             let scope = scope.clone();
             let tls = tls.clone();
             let plugins = plugins.clone();
+            let scanner = scanner.clone();
             let peer_addr = peer;
 
             tokio::spawn(
@@ -89,6 +96,7 @@ impl ProxyServer {
                         let scope = scope.clone();
                         let tls = tls.clone();
                         let plugins = plugins.clone();
+                        let scanner = scanner.clone();
 
                         async move {
                             let request_id = REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -114,6 +122,7 @@ impl ProxyServer {
                                     scope.clone(),
                                     tls.clone(),
                                     plugins.clone(),
+                                    scanner.clone(),
                                 )
                                 .await
                                 {
@@ -161,12 +170,13 @@ async fn handle_request(
     scope: Arc<ScopeManager>,
     tls: Option<Arc<TlsInterceptor>>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
+    scanner: Option<Arc<Scanner>>,
 ) -> Result<Response<ProxyBody>> {
     if req.method() == Method::CONNECT {
-        return handle_connect(req, capture, pool, rules, scope, tls, plugins);
+        return handle_connect(req, capture, pool, rules, scope, tls, plugins, scanner);
     }
 
-    forward_request(req, pool, capture, rules, scope, plugins).await
+    forward_request(req, pool, capture, rules, scope, plugins, scanner).await
 }
 
 fn error_response(err: ProxyError) -> Response<ProxyBody> {
@@ -206,6 +216,7 @@ async fn forward_request(
     rules: Arc<RuleEngine>,
     scope: Arc<ScopeManager>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
+    scanner: Option<Arc<Scanner>>,
 ) -> Result<Response<ProxyBody>> {
     let target_uri = normalize_uri(req.uri(), req.headers())?;
 
@@ -308,6 +319,17 @@ async fn forward_request(
         "Request forwarded"
     );
 
+    // Capture and Scan
+    let entry = crate::capture::CaptureEntry {
+        request: record.clone(),
+        response: Some(captured_response.clone()),
+    };
+
+    // Passive Scan
+    if let Some(scanner) = scanner {
+        scanner.passive_scan(&entry);
+    }
+
     capture.push(record, Some(captured_response));
 
     Ok(Response::from_parts(
@@ -324,6 +346,7 @@ fn handle_connect(
     scope: Arc<ScopeManager>,
     tls: Option<Arc<TlsInterceptor>>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
+    scanner: Option<Arc<Scanner>>,
 ) -> Result<Response<ProxyBody>> {
     let authority = req
         .uri()
@@ -338,9 +361,10 @@ fn handle_connect(
         let capture = capture.clone();
         let rules = rules.clone();
         let scope = scope.clone();
+        let scanner = scanner.clone();
         tokio::spawn(async move {
             if let Err(err) =
-                handle_tls_connect(req, capture, pool, rules, scope, tls, plugins).await
+                handle_tls_connect(req, capture, pool, rules, scope, tls, plugins, scanner).await
             {
                 warn!(%err, "tls intercept error");
             }
@@ -367,6 +391,7 @@ async fn handle_tls_connect(
     scope: Arc<ScopeManager>,
     tls: Arc<TlsInterceptor>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
+    scanner: Option<Arc<Scanner>>,
 ) -> Result<()> {
     let upgraded = hyper::upgrade::on(req).await?;
 
@@ -391,6 +416,7 @@ async fn handle_tls_connect(
         let scope = scope.clone();
         let tls = Some(tls.clone());
         let plugins = plugins.clone();
+        let scanner = scanner.clone();
         async move {
             handle_request(
                 req,
@@ -400,6 +426,7 @@ async fn handle_tls_connect(
                 scope.clone(),
                 tls,
                 plugins,
+                scanner,
             )
             .await
         }
