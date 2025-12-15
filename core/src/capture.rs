@@ -65,14 +65,35 @@ impl RequestCapture {
 
     pub fn with_storage(capacity: usize, storage: Option<Arc<CaptureStorage>>) -> Self {
         let (tx, _) = broadcast::channel(1_024);
+
+        let mut entries = VecDeque::new();
+        let mut max_id = 0;
+
+        if let Some(store) = &storage {
+            // Load latest requests
+            let query = CaptureQuery {
+                limit: Some(capacity),
+                ..Default::default()
+            };
+            if let Ok(loaded) = store.query(&query) {
+                // Query returns DESC order (newest first), so we need to reverse for VecDeque
+                for entry in loaded.into_iter().rev() {
+                    if entry.request.id > max_id {
+                        max_id = entry.request.id;
+                    }
+                    entries.push_back(entry);
+                }
+            }
+        }
+
         Self {
             capacity: if capacity == 0 {
                 DEFAULT_CAPACITY
             } else {
                 capacity
             },
-            entries: RwLock::new(VecDeque::new()),
-            counter: AtomicU64::new(1),
+            entries: RwLock::new(entries),
+            counter: AtomicU64::new(max_id + 1),
             notifier: tx,
             storage,
         }
