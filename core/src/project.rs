@@ -40,8 +40,10 @@ pub struct ProjectData {
 
 impl ProjectData {
     pub fn new(name: impl Into<String>) -> Self {
-        let mut info = ProjectInfo::default();
-        info.name = name.into();
+        let info = ProjectInfo {
+            name: name.into(),
+            ..Default::default()
+        };
         Self {
             info,
             traffic: Vec::new(),

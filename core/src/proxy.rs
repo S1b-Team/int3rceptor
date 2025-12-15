@@ -162,6 +162,7 @@ impl ProxyServer {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_request(
     req: Request<Incoming>,
     pool: ConnectionPool,
@@ -338,6 +339,7 @@ async fn forward_request(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_connect(
     req: Request<Incoming>,
     capture: Arc<RequestCapture>,
@@ -383,6 +385,7 @@ fn handle_connect(
         .unwrap())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_tls_connect(
     req: Request<Incoming>,
     capture: Arc<RequestCapture>,
