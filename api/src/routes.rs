@@ -498,7 +498,11 @@ async fn intruder_generate(
     Json(req): Json<IntruderGenerateRequest>,
 ) -> impl IntoResponse {
     match state.intruder.generate_requests(&req.template, &req.config) {
-        Ok(requests) => Json(json!({ "requests": requests })).into_response(),
+        Ok(requests) => {
+            // Only return request strings for preview, not payloads
+            let request_strings: Vec<String> = requests.into_iter().map(|(r, _)| r).collect();
+            Json(json!({ "requests": request_strings })).into_response()
+        }
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": err.to_string() })),

@@ -90,7 +90,7 @@ impl Intruder {
             let semaphore = Arc::new(tokio::sync::Semaphore::new(concurrency));
             let mut handles = Vec::new();
 
-            for (id, req_str) in requests.into_iter().enumerate() {
+            for (id, (req_str, payload)) in requests.into_iter().enumerate() {
                 if !is_running.load(Ordering::SeqCst) {
                     break;
                 }
@@ -99,6 +99,7 @@ impl Intruder {
                 let pool = pool.clone();
                 let results = results.clone();
                 let req_str = req_str.clone();
+                let payload = payload.clone();
 
                 if delay > 0 {
                     tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
@@ -123,7 +124,7 @@ impl Intruder {
 
                                     results.write().push(IntruderResult {
                                         request_id: id,
-                                        payload: "".to_string(), // TODO: Extract payload from req_str or config
+                                        payload,
                                         status_code: status,
                                         response_length: body_len,
                                         duration_ms: start.elapsed().as_millis() as u64,
@@ -160,11 +161,13 @@ impl Intruder {
         self.is_running.load(Ordering::SeqCst)
     }
 
+    /// Generate requests with their associated payloads
+    /// Returns Vec<(request_string, payload_used)>
     pub fn generate_requests(
         &self,
         template: &str,
         config: &IntruderConfig,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<(String, String)>> {
         match config.attack_type {
             AttackType::Sniper => self.generate_sniper(template, config),
             AttackType::Battering => self.generate_battering(template, config),
@@ -173,7 +176,11 @@ impl Intruder {
         }
     }
 
-    fn generate_sniper(&self, template: &str, config: &IntruderConfig) -> Result<Vec<String>> {
+    fn generate_sniper(
+        &self,
+        template: &str,
+        config: &IntruderConfig,
+    ) -> Result<Vec<(String, String)>> {
         let mut requests = Vec::new();
 
         for payload in &config.payloads {
@@ -190,14 +197,18 @@ impl Intruder {
                     }
                 }
 
-                requests.push(modified);
+                requests.push((modified, payload.clone()));
             }
         }
 
         Ok(requests)
     }
 
-    fn generate_battering(&self, template: &str, config: &IntruderConfig) -> Result<Vec<String>> {
+    fn generate_battering(
+        &self,
+        template: &str,
+        config: &IntruderConfig,
+    ) -> Result<Vec<(String, String)>> {
         let mut requests = Vec::new();
 
         for payload in &config.payloads {
@@ -208,27 +219,33 @@ impl Intruder {
                 modified = modified.replace(&marker, payload);
             }
 
-            requests.push(modified);
+            requests.push((modified, payload.clone()));
         }
 
         Ok(requests)
     }
 
-    fn generate_pitchfork(&self, template: &str, config: &IntruderConfig) -> Result<Vec<String>> {
+    fn generate_pitchfork(
+        &self,
+        template: &str,
+        config: &IntruderConfig,
+    ) -> Result<Vec<(String, String)>> {
         let mut requests = Vec::new();
         let payload_count = config.payloads.len();
         let empty_string = String::new();
 
         for i in 0..payload_count {
             let mut modified = template.to_string();
+            let mut used_payloads = Vec::new();
 
             for position in config.positions.iter() {
                 let marker = format!("§{}§", position.name);
                 let payload = config.payloads.get(i).unwrap_or(&empty_string);
                 modified = modified.replace(&marker, payload);
+                used_payloads.push(payload.clone());
             }
 
-            requests.push(modified);
+            requests.push((modified, used_payloads.join(", ")));
         }
 
         Ok(requests)
@@ -238,7 +255,7 @@ impl Intruder {
         &self,
         template: &str,
         config: &IntruderConfig,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<(String, String)>> {
         let mut requests = Vec::new();
         let position_count = config.positions.len();
 
@@ -252,16 +269,18 @@ impl Intruder {
         for i in 0..total_combinations {
             let mut modified = template.to_string();
             let mut combination_index = i;
+            let mut used_payloads = Vec::new();
 
             for position in &config.positions {
                 let payload_index = combination_index % config.payloads.len();
                 let payload = &config.payloads[payload_index];
                 let marker = format!("§{}§", position.name);
                 modified = modified.replace(&marker, payload);
+                used_payloads.push(payload.clone());
                 combination_index /= config.payloads.len();
             }
 
-            requests.push(modified);
+            requests.push((modified, used_payloads.join(", ")));
         }
 
         Ok(requests)
@@ -355,7 +374,8 @@ mod tests {
         let config = create_config(vec!["pos1", "pos2"], vec!["A", "B"], AttackType::Sniper);
         let template = "param1=§pos1§&param2=§pos2§";
 
-        let requests = intruder.generate_requests(template, &config).unwrap();
+        let results = intruder.generate_requests(template, &config).unwrap();
+        let requests: Vec<String> = results.into_iter().map(|(r, _)| r).collect();
 
         // Sniper: each payload in each position = 2 payloads * 2 positions = 4
         assert_eq!(requests.len(), 4);
@@ -373,7 +393,8 @@ mod tests {
         let config = create_config(vec!["pos1", "pos2"], vec!["X", "Y"], AttackType::Battering);
         let template = "a=§pos1§&b=§pos2§";
 
-        let requests = intruder.generate_requests(template, &config).unwrap();
+        let results = intruder.generate_requests(template, &config).unwrap();
+        let requests: Vec<String> = results.into_iter().map(|(r, _)| r).collect();
 
         // Battering: same payload in all positions = 2 payloads
         assert_eq!(requests.len(), 2);
@@ -391,7 +412,8 @@ mod tests {
         );
         let template = "username=§user§&password=§pass§";
 
-        let requests = intruder.generate_requests(template, &config).unwrap();
+        let results = intruder.generate_requests(template, &config).unwrap();
+        let requests: Vec<String> = results.into_iter().map(|(r, _)| r).collect();
 
         // Pitchfork: parallel iteration = min(payloads, positions) iterations
         assert_eq!(requests.len(), 2);
@@ -406,7 +428,8 @@ mod tests {
         let config = create_config(vec!["p1", "p2"], vec!["1", "2"], AttackType::ClusterBomb);
         let template = "x=§p1§&y=§p2§";
 
-        let requests = intruder.generate_requests(template, &config).unwrap();
+        let results = intruder.generate_requests(template, &config).unwrap();
+        let requests: Vec<String> = results.into_iter().map(|(r, _)| r).collect();
 
         // Cluster bomb: all combinations = 2^2 = 4
         assert_eq!(requests.len(), 4);
@@ -469,7 +492,8 @@ mod tests {
         let config = create_config(vec!["id"], vec!["1", "2", "3"], AttackType::Sniper);
         let template = "/user/§id§";
 
-        let requests = intruder.generate_requests(template, &config).unwrap();
+        let results = intruder.generate_requests(template, &config).unwrap();
+        let requests: Vec<String> = results.into_iter().map(|(r, _)| r).collect();
 
         assert_eq!(requests.len(), 3);
         assert!(requests.contains(&"/user/1".to_string()));
