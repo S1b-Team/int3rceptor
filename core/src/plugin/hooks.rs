@@ -45,7 +45,7 @@ impl PluginHook {
 }
 
 /// Context passed to plugin hooks
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HookContext {
     /// HTTP method (GET, POST, etc.)
     pub method: Option<String>,
@@ -64,19 +64,6 @@ pub struct HookContext {
 
     /// Additional metadata
     pub metadata: HashMap<String, String>,
-}
-
-impl Default for HookContext {
-    fn default() -> Self {
-        Self {
-            method: None,
-            url: None,
-            headers: HashMap::new(),
-            body: None,
-            status_code: None,
-            metadata: HashMap::new(),
-        }
-    }
 }
 
 impl HookContext {

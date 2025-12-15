@@ -2,10 +2,13 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import Badge from './components/base/Badge.vue'
 import Button from './components/base/Button.vue'
+import ComparerView from './components/views/ComparerView.vue'
+import DecoderView from './components/views/DecoderView.vue'
 import ExportView from './components/views/ExportView.vue'
 import IntruderView from './components/views/IntruderView.vue'
 import PluginsView from './components/views/PluginsView.vue'
 import RepeaterView from './components/views/RepeaterView.vue'
+import ScannerView from './components/views/ScannerView.vue'
 import SettingsView from './components/views/SettingsView.vue'
 import TrafficView from './components/views/TrafficView.vue'
 import WebSocketView from './components/views/WebSocketView.vue'
@@ -29,7 +32,9 @@ const tabs = [
   { id: 'repeater', name: 'Repeater', icon: '🔁' },
   { id: 'intruder', name: 'Intruder', icon: '⚔️' },
   { id: 'scanner', name: 'Scanner', icon: '🔍' },
-  { id: 'plugins', name: 'Plugins', icon: '🧩' },
+  { id: 'decoder', name: 'Decoder', icon: '🧩' },
+  { id: 'comparer', name: 'Comparer', icon: '⚖️' },
+  { id: 'plugins', name: 'Plugins', icon: '🔌' },
 ]
 
 // Simple backend connection
@@ -86,13 +91,13 @@ onUnmounted(() => {
       </div>
 
       <!-- Navigation Tabs -->
-      <nav class="flex gap-2">
+      <nav class="flex gap-1 overflow-x-auto no-scrollbar mask-linear-fade">
         <button
           v-for="tab in tabs"
           :key="tab.id"
           @click="currentTab = tab.id"
           :class="[
-            'px-4 py-1 flex flex-col items-center justify-center transition-all duration-200 relative group',
+            'px-3 py-1 flex flex-col items-center justify-center transition-all duration-200 relative group min-w-fit',
             currentTab === tab.id
               ? 'text-i3-cyan'
               : 'text-i3-text-secondary hover:text-i3-text'
@@ -102,15 +107,15 @@ onUnmounted(() => {
           <div class="flex items-center gap-2">
             <span class="text-lg opacity-80 group-hover:opacity-100 transition-opacity">{{ tab.icon }}</span>
             <span :class="[
-              'font-bold tracking-wider',
-              tab.module ? 'font-heading text-lg' : 'font-sans text-sm'
+              'font-bold tracking-wider whitespace-nowrap',
+              tab.module ? 'font-heading text-base' : 'font-sans text-sm'
             ]">
               {{ tab.module || tab.name }}
             </span>
           </div>
 
           <!-- Subtitle (Functional Name for Modules) -->
-          <span v-if="tab.module" class="text-[10px] uppercase tracking-[0.2em] text-i3-text-muted font-mono -mt-1">
+          <span v-if="tab.module" class="text-[9px] uppercase tracking-[0.15em] text-i3-text-muted font-mono -mt-0.5">
             {{ tab.name }}
           </span>
 
@@ -124,22 +129,6 @@ onUnmounted(() => {
           <div class="absolute inset-0 bg-i3-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity rounded" />
         </button>
       </nav>
-
-      <!-- Metrics Bar -->
-      <div class="flex items-center gap-6">
-        <div class="flex items-center gap-2">
-          <span class="text-i3-text-muted text-sm">Requests:</span>
-          <Badge variant="cyan">{{ stats.requests }}</Badge>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-i3-text-muted text-sm">Memory:</span>
-          <Badge variant="orange">{{ stats.memory }} MB</Badge>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-i3-text-muted text-sm">Connections:</span>
-          <Badge variant="magenta">{{ stats.connections }}</Badge>
-        </div>
-      </div>
     </header>
 
     <!-- Main Content Area -->
@@ -270,6 +259,12 @@ onUnmounted(() => {
 
         <!-- Scanner View -->
         <ScannerView v-else-if="currentTab === 'scanner'" />
+
+        <!-- Decoder View -->
+        <DecoderView v-else-if="currentTab === 'decoder'" />
+
+        <!-- Comparer View -->
+        <ComparerView v-else-if="currentTab === 'comparer'" />
 
         <!-- Settings View -->
         <SettingsView v-else-if="currentTab === 'settings'" />

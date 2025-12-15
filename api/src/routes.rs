@@ -16,7 +16,9 @@ use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::{Method, Request, Uri};
 use interceptor_core::capture::{CaptureEntry, CaptureQuery, CapturedRequest, CapturedResponse};
+use interceptor_core::comparer::{CompareRequest, Comparer};
 use interceptor_core::connection_pool::ProxyBody;
+use interceptor_core::encoding::{Encoder, TransformRequest};
 use interceptor_core::metrics;
 use interceptor_core::rules::Rule;
 use reqwest::Client;
@@ -62,6 +64,9 @@ pub fn router() -> Router {
             get(scanner_get_findings).delete(scanner_clear_findings),
         )
         .route("/api/scanner/stats", get(scanner_get_stats))
+        // Encoding & Comparer routes
+        .route("/api/encoding/transform", post(encoding_transform))
+        .route("/api/comparer/diff", post(comparer_diff))
         .route("/api/websocket/connections", get(ws_connections))
         .route("/api/websocket/frames/:connection_id", get(ws_frames))
         .route("/api/websocket/clear", delete(ws_clear))
@@ -659,4 +664,20 @@ async fn scanner_clear_findings(Extension(state): Extension<Arc<AppState>>) -> i
 
 async fn scanner_get_stats(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
     Json(state.scanner.get_stats())
+}
+
+// Encoding & Comparer Handlers
+
+async fn encoding_transform(
+    Json(req): Json<TransformRequest>,
+) -> impl IntoResponse {
+    let response = Encoder::transform(req);
+    Json(response)
+}
+
+async fn comparer_diff(
+    Json(req): Json<CompareRequest>,
+) -> impl IntoResponse {
+    let response = Comparer::compare(req);
+    Json(response)
 }

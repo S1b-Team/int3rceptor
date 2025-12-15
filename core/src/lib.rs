@@ -1,6 +1,8 @@
 pub mod capture;
 pub mod cert_manager;
+pub mod comparer;
 pub mod connection_pool;
+pub mod encoding;
 pub mod error;
 pub mod integration;
 pub mod intruder;
@@ -18,7 +20,11 @@ pub mod websocket;
 
 pub use capture::{CaptureQuery, RequestCapture};
 pub use cert_manager::CertManager;
+pub use comparer::{CompareMode, CompareRequest, CompareResponse, Comparer};
 pub use connection_pool::ConnectionPool;
+pub use encoding::{
+    Encoder, EncodingType, TransformOperation, TransformRequest, TransformResponse,
+};
 pub use integration::{nowaru_bridge::NowaruBridge, voidwalker_bridge::VoidwalkerBridge};
 pub use intruder::Intruder;
 pub use license::{License, LicenseManager, LicenseTier};
