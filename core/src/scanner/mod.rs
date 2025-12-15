@@ -197,7 +197,7 @@ impl Scanner {
                         return;
                     }
 
-                    if let Some(finding) = self.test_payload(target, payload, &rule, pool).await {
+                    if let Some(finding) = self.test_payload(target, payload, rule, pool).await {
                         self.findings.write().push(finding);
                         self.vulnerabilities_found.fetch_add(1, Ordering::SeqCst);
                     }
@@ -238,27 +238,56 @@ impl Scanner {
         let client = pool.client();
         let start = std::time::Instant::now();
 
-        match client.request(request).await {
-            Ok(response) => {
-                let status = response.status().as_u16();
-                let duration = start.elapsed().as_millis() as u64;
+        if let Ok(response) = client.request(request).await {
+            let status = response.status().as_u16();
+            let duration = start.elapsed().as_millis() as u64;
 
-                // Check response for vulnerability indicators
-                if let Ok(body) = http_body_util::BodyExt::collect(response.into_body()).await {
-                    let body_bytes = body.to_bytes();
-                    let body_str = String::from_utf8_lossy(&body_bytes);
+            // Check response for vulnerability indicators
+            // Collect body
+            let body_bytes = match http_body_util::BodyExt::collect(response.into_body()).await {
+                Ok(collected) => collected.to_bytes(),
+                Err(_) => return None,
+            };
 
-                    // Check if payload is reflected (potential XSS)
-                    if rule.category == VulnerabilityCategory::XSS && body_str.contains(payload) {
+            let body_str = String::from_utf8_lossy(&body_bytes);
+
+            // Check if payload is reflected (potential XSS)
+            if rule.category == VulnerabilityCategory::XSS && body_str.contains(payload) {
+                return Some(Finding {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    rule_id: rule.id.clone(),
+                    category: rule.category.clone(),
+                    severity: rule.severity.clone(),
+                    title: format!("{} - Payload Reflected", rule.name),
+                    description: format!("The payload '{}' was reflected in the response", payload),
+                    url: test_url,
+                    evidence: body_str[..body_str.len().min(500)].to_string(),
+                    request: None,
+                    response: Some(ResponseInfo {
+                        status,
+                        length: body_bytes.len(),
+                        duration_ms: duration,
+                    }),
+                    remediation: rule.remediation.clone(),
+                    references: rule.references.clone(),
+                    timestamp: chrono::Utc::now(),
+                    confirmed: false,
+                });
+            }
+
+            // Check for error patterns
+            if !rule.response_patterns.is_empty() {
+                for pattern in &rule.response_patterns {
+                    if body_str.to_lowercase().contains(&pattern.to_lowercase()) {
                         return Some(Finding {
                             id: uuid::Uuid::new_v4().to_string(),
                             rule_id: rule.id.clone(),
                             category: rule.category.clone(),
                             severity: rule.severity.clone(),
-                            title: format!("{} - Payload Reflected", rule.name),
+                            title: format!("{} - Error Pattern Detected", rule.name),
                             description: format!(
-                                "The payload '{}' was reflected in the response",
-                                payload
+                                "Database error pattern '{}' detected in response",
+                                pattern
                             ),
                             url: test_url,
                             evidence: body_str[..body_str.len().min(500)].to_string(),
@@ -271,43 +300,11 @@ impl Scanner {
                             remediation: rule.remediation.clone(),
                             references: rule.references.clone(),
                             timestamp: chrono::Utc::now(),
-                            confirmed: false,
+                            confirmed: true,
                         });
-                    }
-
-                    // Check for error-based detection (SQL injection)
-                    if rule.category == VulnerabilityCategory::Injection {
-                        for pattern in &rule.response_patterns {
-                            if body_str.to_lowercase().contains(&pattern.to_lowercase()) {
-                                return Some(Finding {
-                                    id: uuid::Uuid::new_v4().to_string(),
-                                    rule_id: rule.id.clone(),
-                                    category: rule.category.clone(),
-                                    severity: rule.severity.clone(),
-                                    title: format!("{} - Error Pattern Detected", rule.name),
-                                    description: format!(
-                                        "Database error pattern '{}' detected in response",
-                                        pattern
-                                    ),
-                                    url: test_url,
-                                    evidence: body_str[..body_str.len().min(500)].to_string(),
-                                    request: None,
-                                    response: Some(ResponseInfo {
-                                        status,
-                                        length: body_bytes.len(),
-                                        duration_ms: duration,
-                                    }),
-                                    remediation: rule.remediation.clone(),
-                                    references: rule.references.clone(),
-                                    timestamp: chrono::Utc::now(),
-                                    confirmed: true,
-                                });
-                            }
-                        }
                     }
                 }
             }
-            Err(_) => {}
         }
 
         None

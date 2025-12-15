@@ -299,7 +299,7 @@ onUnmounted(() => {
         </span>
       </div>
       <div class="text-i3-text-muted">
-        Built with ❤️ using Rust + Vue 3 | © 2025 S1BGr0uP
+        Powered by ⚙️ Rust · Vue 3 — crafted with precision by S1BGr0uP © 2025
       </div>
     </footer>
   </div>
