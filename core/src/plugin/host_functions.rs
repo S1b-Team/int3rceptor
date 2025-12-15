@@ -1,3 +1,4 @@
+use super::hooks::HookContext;
 use std::sync::{Arc, RwLock};
 use wasmtime::*;
 
@@ -9,6 +10,9 @@ pub struct HostContext {
 
     /// Plugin name (for logging)
     pub plugin_name: String,
+
+    /// Current hook context (request/response data)
+    pub context: Arc<RwLock<Option<HookContext>>>,
 }
 
 impl HostContext {
@@ -16,14 +20,21 @@ impl HostContext {
         Self {
             logs: Arc::new(RwLock::new(Vec::new())),
             plugin_name,
+            context: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    pub fn with_context(plugin_name: String, context: HookContext) -> Self {
+        Self {
+            logs: Arc::new(RwLock::new(Vec::new())),
+            plugin_name,
+            context: Arc::new(RwLock::new(Some(context))),
         }
     }
 
     pub fn add_log(&self, message: String) {
         if let Ok(mut logs) = self.logs.write() {
             logs.push(format!("[{}] {}", self.plugin_name, message));
-
-            // Also log via tracing
             tracing::info!(plugin = %self.plugin_name, "{}", message);
         }
     }
@@ -32,7 +43,6 @@ impl HostContext {
 /// Define host functions available to plugins
 pub fn define_host_functions(linker: &mut Linker<HostContext>) -> anyhow::Result<()> {
     // host_log(level: i32, msg_ptr: i32, msg_len: i32)
-    // Log a message from the plugin
     linker.func_wrap(
         "env",
         "host_log",
@@ -47,7 +57,7 @@ pub fn define_host_functions(linker: &mut Linker<HostContext>) -> anyhow::Result
             let msg_len = msg_len as usize;
 
             if msg_ptr + msg_len > data.len() {
-                return -1; // Out of bounds
+                return -1;
             }
 
             let msg_bytes = &data[msg_ptr..msg_ptr + msg_len];
@@ -70,8 +80,142 @@ pub fn define_host_functions(linker: &mut Linker<HostContext>) -> anyhow::Result
         },
     )?;
 
+    // host_get_header(name_ptr: i32, name_len: i32, val_ptr: i32, val_max_len: i32) -> i32
+    // Returns length of value, or -1 if not found/error
+    linker.func_wrap(
+        "env",
+        "host_get_header",
+        |mut caller: Caller<'_, HostContext>,
+         name_ptr: i32,
+         name_len: i32,
+         val_ptr: i32,
+         val_max_len: i32|
+         -> i32 {
+            let mem = match caller.get_export("memory") {
+                Some(Extern::Memory(mem)) => mem,
+                _ => return -1,
+            };
+
+            let (memory, ctx) = mem.data_and_store_mut(&mut caller);
+            let name_ptr = name_ptr as usize;
+            let name_len = name_len as usize;
+
+            if name_ptr + name_len > memory.len() {
+                return -1;
+            }
+
+            let name = match String::from_utf8(memory[name_ptr..name_ptr + name_len].to_vec()) {
+                Ok(s) => s,
+                Err(_) => return -1,
+            };
+
+            if let Ok(guard) = ctx.context.read() {
+                if let Some(hook_ctx) = guard.as_ref() {
+                    if let Some(value) = hook_ctx.headers.get(&name) {
+                        let value_bytes = value.as_bytes();
+                        let len = value_bytes.len();
+
+                        if len > val_max_len as usize {
+                            return len as i32; // Return needed size if buffer too small
+                        }
+
+                        let val_ptr = val_ptr as usize;
+                        if val_ptr + len > memory.len() {
+                            return -1;
+                        }
+
+                        memory[val_ptr..val_ptr + len].copy_from_slice(value_bytes);
+                        return len as i32;
+                    }
+                }
+            }
+            -1 // Not found
+        },
+    )?;
+
+    // host_set_header(name_ptr: i32, name_len: i32, val_ptr: i32, val_len: i32) -> i32
+    linker.func_wrap(
+        "env",
+        "host_set_header",
+        |mut caller: Caller<'_, HostContext>,
+         name_ptr: i32,
+         name_len: i32,
+         val_ptr: i32,
+         val_len: i32|
+         -> i32 {
+            let mem = match caller.get_export("memory") {
+                Some(Extern::Memory(mem)) => mem,
+                _ => return -1,
+            };
+
+            let data = mem.data(&caller);
+            let name_ptr = name_ptr as usize;
+            let name_len = name_len as usize;
+            let val_ptr = val_ptr as usize;
+            let val_len = val_len as usize;
+
+            if name_ptr + name_len > data.len() || val_ptr + val_len > data.len() {
+                return -1;
+            }
+
+            let name = match String::from_utf8(data[name_ptr..name_ptr + name_len].to_vec()) {
+                Ok(s) => s,
+                Err(_) => return -1,
+            };
+
+            let value = match String::from_utf8(data[val_ptr..val_ptr + val_len].to_vec()) {
+                Ok(s) => s,
+                Err(_) => return -1,
+            };
+
+            let ctx = caller.data();
+            if let Ok(mut guard) = ctx.context.write() {
+                if let Some(hook_ctx) = guard.as_mut() {
+                    hook_ctx.headers.insert(name, value);
+                    return 0; // Success
+                }
+            }
+            -1
+        },
+    )?;
+
+    // host_get_method(buf_ptr: i32, max_len: i32) -> i32
+    linker.func_wrap(
+        "env",
+        "host_get_method",
+        |mut caller: Caller<'_, HostContext>, buf_ptr: i32, max_len: i32| -> i32 {
+            let mem = match caller.get_export("memory") {
+                Some(Extern::Memory(mem)) => mem,
+                _ => return -1,
+            };
+
+            let (memory, ctx) = mem.data_and_store_mut(&mut caller);
+
+            if let Ok(guard) = ctx.context.read() {
+                if let Some(hook_ctx) = guard.as_ref() {
+                    if let Some(method) = &hook_ctx.method {
+                        let bytes = method.as_bytes();
+                        let len = bytes.len();
+
+                        if len > max_len as usize {
+                            return len as i32;
+                        }
+
+                        let buf_ptr = buf_ptr as usize;
+                        if buf_ptr + len > memory.len() {
+                            return -1;
+                        }
+
+                        memory[buf_ptr..buf_ptr + len].copy_from_slice(bytes);
+                        return len as i32;
+                    }
+                }
+            }
+            -1
+        },
+    )?;
+
     // host_get_memory_size() -> i32
-    // Get current memory size allocated to the plugin
     linker.func_wrap(
         "env",
         "host_get_memory_size",
@@ -86,7 +230,6 @@ pub fn define_host_functions(linker: &mut Linker<HostContext>) -> anyhow::Result
     )?;
 
     // host_abort(msg_ptr: i32, msg_len: i32)
-    // Abort plugin execution with an error message
     linker.func_wrap(
         "env",
         "host_abort",

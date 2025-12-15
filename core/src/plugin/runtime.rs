@@ -52,11 +52,14 @@ impl PluginRuntime {
 
     /// Call a hook function in the plugin
     /// This is a simplified version that returns unmodified context for now
-    pub fn call_hook(&self, hook: PluginHook, _context: &HookContext) -> Result<HookResult> {
+    pub fn call_hook(&self, hook: PluginHook, context: &HookContext) -> Result<HookResult> {
         let start = Instant::now();
 
-        // Create store with host context
-        let host_ctx = HostContext::new(self.config.name.clone());
+        // Create store with host context initialized with current request data
+        let host_ctx = HostContext::with_context(self.config.name.clone(), context.clone());
+        // Keep a reference to the shared context to retrieve modifications later
+        let shared_context = host_ctx.context.clone();
+
         let mut store = Store::new(&self.engine, host_ctx);
 
         // Set fuel limit (computational budget)
@@ -79,7 +82,6 @@ impl PluginRuntime {
         let hook_name = hook.as_str();
 
         // For now, if the function exists, we just call it without arguments
-        // This is a simplified implementation - full version would pass context
         if let Some(func) = instance.get_func(&mut store, hook_name) {
             // Try to call as a no-arg function returning i32
             if let Ok(typed_func) = func.typed::<(), i32>(&store) {
@@ -91,6 +93,15 @@ impl PluginRuntime {
                             result = result,
                             "Hook executed"
                         );
+
+                        // Check if context was modified
+                        if let Ok(guard) = shared_context.read() {
+                            if let Some(modified_ctx) = guard.as_ref() {
+                                // Simple check: if we have a context here, we assume it might be modified
+                                // Ideally we would compare with original, but for now we return it
+                                return Ok(HookResult::modified(modified_ctx.clone()));
+                            }
+                        }
                     }
                     Err(e) => {
                         tracing::warn!(
@@ -113,8 +124,6 @@ impl PluginRuntime {
             )));
         }
 
-        // For now, return unmodified result
-        // Full implementation would pass context to plugin and get modified result back
         Ok(HookResult::unmodified())
     }
 
