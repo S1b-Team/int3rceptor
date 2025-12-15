@@ -26,6 +26,8 @@ const stats = ref({
   connections: 0,
 })
 
+const recentRequests = ref<TrafficItem[]>([])
+
 const tabs = [
   { id: 'dashboard', name: 'Dashboard', icon: '📊' },
   { id: 'traffic', name: 'Traffic', icon: '📡', module: 'NOWARU' },
@@ -50,6 +52,10 @@ async function fetchStats() {
       stats.value.memory = data.memory || 0
       stats.value.connections = data.connections || 0
     }
+
+    // Fetch recent traffic
+    const traffic = await apiClient.getTraffic(5)
+    recentRequests.value = traffic
   } catch (error) {
     // Backend not ready yet
   }
@@ -288,23 +294,14 @@ async function handleLoadProject() {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-i3-border">
-                  <tr class="hover:bg-i3-bg-alt/50 transition-colors">
-                    <td class="py-3"><Badge variant="cyan">GET</Badge></td>
-                    <td class="py-3 text-i3-text">https://api.example.com/users</td>
-                    <td class="py-3"><Badge variant="cyan" outline>200</Badge></td>
-                    <td class="py-3 text-i3-text-secondary">1.2 KB</td>
+                  <tr v-for="req in recentRequests" :key="req.id" class="hover:bg-i3-bg-alt/50 transition-colors">
+                    <td class="py-3"><Badge :variant="req.method === 'GET' ? 'cyan' : req.method === 'POST' ? 'orange' : 'magenta'">{{ req.method }}</Badge></td>
+                    <td class="py-3 text-i3-text truncate max-w-[200px]" :title="req.url">{{ req.url }}</td>
+                    <td class="py-3"><Badge variant="cyan" outline>{{ req.status }}</Badge></td>
+                    <td class="py-3 text-i3-text-secondary">{{ req.size }} B</td>
                   </tr>
-                  <tr class="hover:bg-i3-bg-alt/50 transition-colors">
-                    <td class="py-3"><Badge variant="orange">POST</Badge></td>
-                    <td class="py-3 text-i3-text">https://api.example.com/login</td>
-                    <td class="py-3"><Badge variant="cyan" outline>201</Badge></td>
-                    <td class="py-3 text-i3-text-secondary">512 B</td>
-                  </tr>
-                  <tr class="hover:bg-i3-bg-alt/50 transition-colors">
-                    <td class="py-3"><Badge variant="orange">PUT</Badge></td>
-                    <td class="py-3 text-i3-text">https://api.example.com/profile</td>
-                    <td class="py-3"><Badge variant="magenta" outline>404</Badge></td>
-                    <td class="py-3 text-i3-text-secondary">256 B</td>
+                  <tr v-if="recentRequests.length === 0">
+                    <td colspan="4" class="py-4 text-center text-i3-text-muted">No requests captured yet</td>
                   </tr>
                 </tbody>
               </table>

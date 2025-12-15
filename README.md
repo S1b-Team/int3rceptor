@@ -2,7 +2,6 @@
 
 <img width="1024" height="682" alt="project_banner" src="https://github.com/user-attachments/assets/9d940bcc-084b-4030-861e-bda4aafe15c5" />
 
-
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg?style=for-the-badge)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Vue](https://img.shields.io/badge/vue-3.4%2B-green.svg?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -112,6 +111,21 @@
 -   SQLite-backed storage
 -   Advanced filtering and search
 -   Export to JSON, CSV, HAR formats
+
+#### 🛡️ **Vulnerability Scanner** 🆕 NEW in v2.0
+
+-   **Passive Scanning**: Analyze traffic in real-time without sending extra requests
+-   **Active Scanning**: Automated payload injection for SQLi, XSS, etc.
+-   **Vulnerability Management**: Track, verify, and report findings
+-   **Custom Rules**: Define detection logic with regex and conditions
+-   **Reporting**: Export findings with remediation steps
+
+#### 📂 **Project Management** 🆕 NEW in v2.0
+
+-   **Workspaces**: Organize your work into projects
+-   **State Saving**: Save and load complete session state
+-   **Scope Isolation**: Define different scopes per project
+-   **Collaboration**: Share project files with team members
 
 ---
 
@@ -227,7 +241,7 @@ cd ..
 
 Configure your browser to use `127.0.0.1:8080` as the HTTP/HTTPS proxy.
 
-**Firefox**: Settings → Network Settings → Manual proxy configuration  
+**Firefox**: Settings → Network Settings → Manual proxy configuration
 **Chrome**: Settings → System → Open proxy settings
 
 ---
@@ -477,7 +491,7 @@ npm run dev
 | **UI Technology**          | **Vue 3**        | Swing (legacy) | 🏆 Int3rceptor (modern)      |
 | **WebSocket Interception** | **✅ Full**      | ❌ Limited     | 🏆 Int3rceptor               |
 | **Intruder Modes**         | ✅ 4 modes       | ✅ 4 modes     | 🤝 Tie                       |
-| **Scanner**                | ❌ Planned       | ✅ Advanced    | ⚠️ Burp Suite                |
+| **Scanner**                | ✅ Advanced      | ✅ Advanced    | 🤝 Tie                       |
 | **Collaborator**           | ❌ Planned       | ✅ Yes         | ⚠️ Burp Suite                |
 | **Extensions**             | ❌ Planned       | ✅ 1000+       | ⚠️ Burp Suite                |
 
@@ -549,7 +563,7 @@ npm run dev
 
 ### How to Purchase
 
-📧 **Email**: s1bgr0up.root@gmail.com  
+📧 **Email**: s1bgr0up.root@gmail.com
 📄 **Details**: See [LICENSE_COMMERCIAL.md](LICENSE_COMMERCIAL.md)
 
 ---
@@ -569,7 +583,7 @@ This software is licensed under a **proprietary license**:
 -   ❌ **No redistribution or forking** for derivative works
 -   ❌ **No modification** without permission
 
-**Full license**: [LICENSE](LICENSE)  
+**Full license**: [LICENSE](LICENSE)
 **Commercial licensing**: [LICENSE_COMMERCIAL.md](LICENSE_COMMERCIAL.md)
 
 ### Why Proprietary?
