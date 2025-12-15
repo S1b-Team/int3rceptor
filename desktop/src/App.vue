@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { apiClient } from './api/client'
 import Badge from './components/base/Badge.vue'
 import Button from './components/base/Button.vue'
 import ComparerView from './components/views/ComparerView.vue'
@@ -76,6 +77,68 @@ onUnmounted(() => {
     clearInterval(intervalId)
   }
 })
+
+// Project Management
+const showProjectModal = ref(false)
+const projectInfo = ref({
+  name: 'Untitled Project',
+  description: '',
+  path: ''
+})
+
+async function openProjectModal() {
+  try {
+    const info = await apiClient.projectInfo()
+    projectInfo.value = { ...projectInfo.value, ...info }
+    showProjectModal.value = true
+  } catch (e) {
+    console.error('Failed to load project info', e)
+  }
+}
+
+async function handleNewProject() {
+  const name = prompt('Enter new project name:')
+  if (name) {
+    try {
+      await apiClient.projectNew(name)
+      await openProjectModal()
+      alert('New project created!')
+    } catch (e) {
+      alert('Failed to create project')
+    }
+  }
+}
+
+async function handleSaveProject() {
+  if (!projectInfo.value.path) {
+    const path = prompt('Enter file path to save (e.g., /tmp/audit.i3p):')
+    if (!path) return
+    projectInfo.value.path = path
+  }
+
+  try {
+    // TODO: Get real scope from store
+    await apiClient.projectSave(projectInfo.value.path, [])
+    await apiClient.projectUpdate(projectInfo.value.name, projectInfo.value.description)
+    alert('Project saved successfully!')
+  } catch (e) {
+    alert('Failed to save project: ' + e)
+  }
+}
+
+async function handleLoadProject() {
+  const path = prompt('Enter file path to load:')
+  if (path) {
+    try {
+      await apiClient.projectLoad(path)
+      projectInfo.value.path = path
+      await openProjectModal()
+      alert('Project loaded successfully!')
+    } catch (e) {
+      alert('Failed to load project: ' + e)
+    }
+  }
+}
 </script>
 
 <template>
@@ -88,6 +151,10 @@ onUnmounted(() => {
           <span class="text-i3-cyan">INT</span><span class="text-i3-magenta">3</span><span class="text-i3-cyan">RCEPTOR</span>
         </div>
         <div class="text-i3-text-muted text-sm">v3.0 Beta</div>
+        <button @click="openProjectModal" class="ml-4 px-3 py-1 bg-i3-bg border border-i3-border rounded text-xs hover:border-i3-cyan hover:text-i3-cyan transition-colors flex items-center gap-2">
+          <span>📁</span>
+          <span>{{ projectInfo.name || 'Project' }}</span>
+        </button>
       </div>
 
       <!-- Navigation Tabs -->
@@ -297,6 +364,38 @@ onUnmounted(() => {
         Powered by ⚙️ Rust · Vue 3 — crafted with precision by S1BGr0uP © 2025
       </div>
     </footer>
+
+    <!-- Project Modal -->
+    <div v-if="showProjectModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div class="bg-i3-bg-alt border border-i3-border rounded-lg shadow-2xl w-[500px] max-w-full flex flex-col max-h-[90vh]">
+        <div class="p-4 border-b border-i3-border flex justify-between items-center">
+          <h2 class="text-lg font-bold text-i3-text">Project Management</h2>
+          <button @click="showProjectModal = false" class="text-i3-text-muted hover:text-i3-text">✕</button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-i3-text-muted uppercase mb-1">Project Name</label>
+            <input v-model="projectInfo.name" type="text" class="w-full bg-i3-bg border border-i3-border rounded px-3 py-2 text-i3-text focus:border-i3-cyan outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-i3-text-muted uppercase mb-1">Description</label>
+            <textarea v-model="projectInfo.description" class="w-full bg-i3-bg border border-i3-border rounded px-3 py-2 text-i3-text focus:border-i3-cyan outline-none h-24"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-i3-text-muted uppercase mb-1">File Path</label>
+            <div class="flex gap-2">
+              <input v-model="projectInfo.path" type="text" readonly class="flex-1 bg-i3-bg border border-i3-border rounded px-3 py-2 text-i3-text-muted outline-none cursor-not-allowed">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 pt-4 border-t border-i3-border">
+            <Button variant="secondary" @click="handleNewProject">✨ New Project</Button>
+            <Button variant="secondary" @click="handleLoadProject">📂 Load Project</Button>
+            <Button variant="primary" @click="handleSaveProject" class="col-span-2">💾 Save Project</Button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 

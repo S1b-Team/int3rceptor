@@ -279,6 +279,32 @@ class INT3RCEPTORClient {
         const response = await this.client.delete("/websocket/clear");
         return response.data;
     }
+
+    // Project API
+    async projectSave(path: string, scope: string[]) {
+        const response = await this.client.post("/project/save", { path, scope });
+        return response.data;
+    }
+
+    async projectLoad(path: string) {
+        const response = await this.client.post("/project/load", { path });
+        return response.data;
+    }
+
+    async projectInfo() {
+        const response = await this.client.get("/project/info");
+        return response.data;
+    }
+
+    async projectUpdate(name?: string, description?: string) {
+        const response = await this.client.put("/project/info", { name, description });
+        return response.data;
+    }
+
+    async projectNew(name: string) {
+        const response = await this.client.post("/project/new", { name });
+        return response.data;
+    }
 }
 
 // Export singleton instance

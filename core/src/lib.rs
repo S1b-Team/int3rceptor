@@ -9,6 +9,7 @@ pub mod intruder;
 pub mod license;
 pub mod metrics;
 pub mod plugin;
+pub mod project;
 pub mod proxy;
 pub mod rules;
 pub mod scanner;
@@ -29,6 +30,7 @@ pub use integration::{nowaru_bridge::NowaruBridge, voidwalker_bridge::Voidwalker
 pub use intruder::Intruder;
 pub use license::{License, LicenseManager, LicenseTier};
 pub use metrics::{metrics, Metrics, MetricsSnapshot};
+pub use project::{ProjectData, ProjectInfo, ProjectManager, ProjectSummary};
 pub use scanner::{
     DetectionRule, Finding, ScanConfig, ScanStats, Scanner, Severity, VulnerabilityCategory,
 };

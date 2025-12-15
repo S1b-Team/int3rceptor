@@ -23,11 +23,12 @@ use interceptor_core::proxy::ProxyServer;
 use interceptor_core::tls::TlsInterceptor;
 use interceptor_core::{
     capture::RequestCapture, cert_manager::CertManager, rules::RuleEngine, storage::CaptureStorage,
-    Intruder, Scanner, ScopeManager, WsCapture,
+    Intruder, ProjectManager, Scanner, ScopeManager, WsCapture,
 };
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -184,6 +185,8 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let project_manager = Arc::new(ProjectManager::new(Some(storage.clone())));
+
     let api_state = interceptor_api::state::AppState {
         capture: capture.clone(),
         cert_manager: cert_manager.clone(),
@@ -193,6 +196,7 @@ async fn main() -> anyhow::Result<()> {
         intruder: intruder.clone(),
         scanner: Arc::new(Scanner::new()),
         ws_capture: ws_capture.clone(),
+        project_manager,
         api_token,
         max_body_bytes,
         max_concurrency,

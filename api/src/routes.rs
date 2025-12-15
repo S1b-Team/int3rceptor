@@ -142,6 +142,11 @@ pub fn router() -> Router {
         .route("/api/websocket/connections", get(ws_connections))
         .route("/api/websocket/frames/:connection_id", get(ws_frames))
         .route("/api/websocket/clear", delete(ws_clear))
+        // Project routes
+        .route("/api/project/save", post(project_save))
+        .route("/api/project/load", post(project_load))
+        .route("/api/project/info", get(project_info).put(project_update))
+        .route("/api/project/new", post(project_new))
         // Metrics and monitoring
         .route("/api/metrics", get(get_metrics))
         .route("/api/metrics/reset", post(reset_metrics))
@@ -752,4 +757,114 @@ async fn encoding_transform(Json(req): Json<TransformRequest>) -> impl IntoRespo
 async fn comparer_diff(Json(req): Json<CompareRequest>) -> impl IntoResponse {
     let response = Comparer::compare(req);
     Json(response)
+}
+
+// Project Handlers
+
+#[derive(Deserialize)]
+struct ProjectSaveRequest {
+    path: String,
+    scope: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct ProjectLoadRequest {
+    path: String,
+}
+
+#[derive(Deserialize)]
+struct ProjectNewRequest {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct ProjectUpdateRequest {
+    name: Option<String>,
+    description: Option<String>,
+}
+
+async fn project_save(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(req): Json<ProjectSaveRequest>,
+) -> impl IntoResponse {
+    let settings = serde_json::to_value(&*state.settings.read().await).unwrap_or_default();
+    match state.project_manager.export(req.scope, settings) {
+        Ok(data) => match data.save_to_file(&req.path) {
+            Ok(_) => StatusCode::OK.into_response(),
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+                .into_response(),
+        },
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn project_load(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(req): Json<ProjectLoadRequest>,
+) -> impl IntoResponse {
+    match interceptor_core::project::ProjectData::load_from_file(&req.path) {
+        Ok(data) => {
+            // Restore scope
+            state
+                .scope
+                .set_config(interceptor_core::scope::ScopeConfig {
+                    includes: data.scope.clone(),
+                    excludes: vec![], // TODO: Save excludes in project data
+                });
+
+            // Restore settings
+            if let Ok(settings) = serde_json::from_value(data.settings.clone()) {
+                *state.settings.write().await = settings;
+            }
+
+            match state.project_manager.import(data) {
+                Ok(_) => StatusCode::OK.into_response(),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+                    .into_response(),
+            }
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+async fn project_info(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.project_manager.current_info())
+}
+
+async fn project_update(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(req): Json<ProjectUpdateRequest>,
+) -> impl IntoResponse {
+    state.project_manager.update_info(req.name, req.description);
+    StatusCode::OK
+}
+
+async fn project_new(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(req): Json<ProjectNewRequest>,
+) -> impl IntoResponse {
+    state.project_manager.new_project(req.name);
+    // Clear other state
+    state
+        .scope
+        .set_config(interceptor_core::scope::ScopeConfig::default());
+    state.intruder.clear_results();
+    state.ws_capture.clear();
+    state.scanner.clear_findings();
+
+    StatusCode::OK
 }
