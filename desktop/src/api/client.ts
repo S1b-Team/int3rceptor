@@ -93,6 +93,17 @@ class INT3RCEPTORClient {
         return response.data;
     }
 
+    async uploadPlugin(file: File) {
+        const formData = new FormData();
+        formData.append('plugin', file);
+        const response = await this.client.post('/plugins/upload', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    }
+
     // Stats API
     async getStats() {
         try {

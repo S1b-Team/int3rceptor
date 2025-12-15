@@ -51,7 +51,7 @@ const swap = () => {
       <h2 class="text-xl font-bold text-i3-cyan">🧩 Decoder / Encoder</h2>
 
       <div class="flex gap-4 bg-i3-bg-alt p-2 rounded border border-i3-border">
-        <select v-model="encoding" class="bg-i3-bg border border-i3-border rounded px-2 py-1 text-i3-text focus:outline-none focus:border-i3-cyan">
+        <select v-model="encoding" class="bg-white text-black border border-i3-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-i3-cyan">
           <option value="base64">Base64</option>
           <option value="url">URL</option>
           <option value="hex">Hex</option>

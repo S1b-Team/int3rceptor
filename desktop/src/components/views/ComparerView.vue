@@ -34,7 +34,10 @@ const clear = () => {
       <h2 class="text-xl font-bold text-i3-cyan">⚖️ Comparer</h2>
 
       <div class="flex gap-2">
-        <select v-model="mode" class="bg-i3-bg-alt border border-i3-border rounded px-3 py-1 text-i3-text focus:outline-none focus:border-i3-cyan">
+        <select
+          v-model="mode"
+          class="bg-white text-black px-3 py-1.5 rounded text-sm font-medium focus:outline-none focus:ring-2 focus:ring-i3-cyan"
+        >
           <option value="lines">Lines</option>
           <option value="words">Words</option>
           <option value="chars">Chars</option>

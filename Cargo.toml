@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "api", "cli", "tools/license-gen"]
+members = ["core", "api", "cli", "tools/license-gen", "examples/simple-plugin"]
 exclude = ["plugins/*", "desktop/src-tauri"]
 resolver = "2"
 
@@ -16,7 +16,7 @@ hyper-rustls = { version = "0.26", features = ["http1", "http2", "ring", "webpki
 rustls = "0.22"
 tokio-rustls = "0.25"
 rcgen = { version = "0.12", features = ["x509-parser", "pem"] }
-axum = { version = "0.7", features = ["macros", "ws"] }
+axum = { version = "0.7", features = ["macros", "ws", "multipart"] }
 tower = { version = "0.4", features = ["limit", "timeout"] }
 tower-http = { version = "0.5", features = ["cors", "fs", "trace", "limit"] }
 tokio-tungstenite = "0.21"

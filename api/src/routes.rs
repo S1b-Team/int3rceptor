@@ -5,7 +5,7 @@ use crate::{
     },
     state::AppState,
 };
-use axum::extract::{Extension, Path, Query};
+use axum::extract::{Extension, Multipart, Path, Query};
 use axum::http::{header, HeaderMap, HeaderName, StatusCode};
 use axum::response::{IntoResponse, Json};
 use axum::routing::{delete, get, post};
@@ -20,13 +20,84 @@ use interceptor_core::comparer::{CompareRequest, Comparer};
 use interceptor_core::connection_pool::ProxyBody;
 use interceptor_core::encoding::{Encoder, TransformRequest};
 use interceptor_core::metrics;
+use interceptor_core::plugin::config::{PluginConfig, PluginPermissions};
 use interceptor_core::rules::Rule;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::json;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+
+// ... existing handlers ...
+
+async fn upload_plugin(
+    Extension(state): Extension<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> impl IntoResponse {
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        let file_name = if let Some(name) = field.file_name() {
+            name.to_string()
+        } else {
+            continue;
+        };
+
+        if !file_name.ends_with(".wasm") {
+            continue;
+        }
+
+        let data = if let Ok(bytes) = field.bytes().await {
+            bytes
+        } else {
+            continue;
+        };
+
+        // Ensure plugins directory exists
+        let plugins_dir = PathBuf::from("plugins");
+        if !plugins_dir.exists() {
+            let _ = fs::create_dir_all(&plugins_dir);
+        }
+
+        let file_path = plugins_dir.join(&file_name);
+        if let Err(e) = fs::write(&file_path, &data) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Failed to save file: {}", e) })),
+            );
+        }
+
+        // Create config and load
+        let plugin_name = file_name.trim_end_matches(".wasm").to_string();
+        let config = PluginConfig {
+            name: plugin_name.clone(),
+            path: file_path,
+            enabled: true,
+            priority: 100,
+            ..Default::default()
+        };
+
+        if let Err(e) = state.plugin_manager.load_plugin(config) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Failed to load plugin: {}", e) })),
+            );
+        }
+
+        return (
+            StatusCode::OK,
+            Json(
+                json!({ "message": "Plugin uploaded and loaded successfully", "name": plugin_name }),
+            ),
+        );
+    }
+
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "error": "No .wasm file found in request" })),
+    )
+}
 
 pub fn router() -> Router {
     Router::new()
@@ -36,6 +107,7 @@ pub fn router() -> Router {
         .route("/api/repeater/send", post(send_manual_request))
         .route("/api/settings", get(get_settings).put(update_settings))
         .route("/api/plugins", get(list_plugins))
+        .route("/api/plugins/upload", post(upload_plugin))
         .route("/api/plugins/:name/toggle", post(toggle_plugin))
         .route("/api/requests/export", get(export_requests))
         .route("/api/ca-cert", get(download_ca_cert))
@@ -668,16 +740,12 @@ async fn scanner_get_stats(Extension(state): Extension<Arc<AppState>>) -> impl I
 
 // Encoding & Comparer Handlers
 
-async fn encoding_transform(
-    Json(req): Json<TransformRequest>,
-) -> impl IntoResponse {
+async fn encoding_transform(Json(req): Json<TransformRequest>) -> impl IntoResponse {
     let response = Encoder::transform(req);
     Json(response)
 }
 
-async fn comparer_diff(
-    Json(req): Json<CompareRequest>,
-) -> impl IntoResponse {
+async fn comparer_diff(Json(req): Json<CompareRequest>) -> impl IntoResponse {
     let response = Comparer::compare(req);
     Json(response)
 }

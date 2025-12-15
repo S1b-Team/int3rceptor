@@ -69,7 +69,7 @@ function handleExport() {
           <div class="space-y-6 flex-1">
             <div class="space-y-2">
               <label class="text-sm text-i3-text-secondary font-bold">Scope</label>
-              <select v-model="exportScope" class="w-full bg-i3-bg border border-i3-border rounded p-2 text-i3-text focus:border-i3-cyan outline-none">
+              <select v-model="exportScope" class="w-full bg-white text-black border border-i3-border rounded p-2 focus:border-i3-cyan outline-none focus:ring-2 focus:ring-i3-cyan">
                 <option value="all">All Captured Traffic</option>
                 <option value="filtered">Current Filtered View</option>
                 <option value="selected">Selected Requests Only</option>

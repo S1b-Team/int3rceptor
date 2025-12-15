@@ -41,6 +41,23 @@ function removePlugin(plugin: any) {
   // Not implemented in backend yet
   console.log('Remove plugin:', plugin.name)
 }
+
+const fileInput = ref<HTMLInputElement | null>(null)
+
+async function handleFileUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (!file) return
+    try {
+      await apiClient.uploadPlugin(file)
+      await loadPlugins()
+      // Reset input
+      target.value = ''
+    } catch (e) {
+      console.error('Failed to upload plugin', e)
+      alert('Failed to upload plugin: ' + e)
+    }
+}
 </script>
 
 <template>
@@ -57,7 +74,14 @@ function removePlugin(plugin: any) {
         <Button variant="secondary" @click="loadPlugins">
           <span class="mr-2">↻</span> Refresh
         </Button>
-        <Button variant="primary">
+        <input
+          type="file"
+          ref="fileInput"
+          accept=".wasm"
+          class="hidden"
+          @change="handleFileUpload"
+        />
+        <Button variant="primary" @click="fileInput?.click()">
           <span class="mr-2">+</span> Load Plugin
         </Button>
       </div>

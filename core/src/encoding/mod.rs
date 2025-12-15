@@ -42,7 +42,7 @@ impl Encoder {
     }
 
     fn encode(input: String, encoding: EncodingType) -> TransformResponse {
-        let result = match encoding {
+        let result: Result<String, String> = match encoding {
             EncodingType::Base64 => Ok(general_purpose::STANDARD.encode(input)),
             EncodingType::Url => Ok(urlencoding::encode(&input).to_string()),
             EncodingType::Hex => Ok(hex::encode(input)),

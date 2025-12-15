@@ -66,15 +66,21 @@ async function sendRequest() {
   }
 }
 
-const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
+
 </script>
 
 <template>
   <div class="h-full flex flex-col">
     <!-- Top Bar: URL & Send -->
     <div class="flex gap-4 mb-4 p-4 panel bg-i3-bg-alt/50 items-center">
-      <select v-model="method" class="bg-i3-bg border border-i3-border rounded px-3 py-2 font-bold text-i3-cyan focus:border-i3-cyan outline-none cursor-pointer hover:border-i3-cyan/50 transition-colors">
-        <option v-for="m in methods" :key="m" :value="m">{{ m }}</option>
+      <select v-model="method" class="bg-white text-black border border-i3-border rounded px-3 py-2 font-bold focus:border-i3-cyan outline-none cursor-pointer focus:ring-2 focus:ring-i3-cyan transition-colors">
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="DELETE">DELETE</option>
+        <option value="PATCH">PATCH</option>
+        <option value="HEAD">HEAD</option>
+        <option value="OPTIONS">OPTIONS</option>
       </select>
 
       <input
