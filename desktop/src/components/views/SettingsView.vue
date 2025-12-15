@@ -22,6 +22,8 @@ const uiConfig = ref({
   notifications: true
 })
 
+const showCertGuide = ref(false)
+
 onMounted(async () => {
   try {
     const settings = await apiClient.getSettings()
@@ -53,6 +55,23 @@ async function saveSettings() {
   } catch (e) {
     console.error('Failed to save settings', e)
     alert('Failed to save settings')
+  }
+}
+
+async function downloadCert() {
+  try {
+    const response = await fetch(`${apiClient.baseUrl}/ca-cert`)
+    if (!response.ok) throw new Error('Failed to download')
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'interceptor-ca.pem'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error('Failed to download certificate', e)
+    alert('Failed to download certificate')
   }
 }
 </script>
@@ -100,6 +119,22 @@ async function saveSettings() {
         </div>
       </section>
 
+      <!-- TLS Certificate -->
+      <section class="panel bg-i3-bg-alt/50">
+        <h3 class="text-lg font-bold text-i3-text mb-4 border-b border-i3-border pb-2">🔐 TLS Certificate</h3>
+        <p class="text-sm text-i3-text-secondary mb-4">
+          To intercept HTTPS traffic, you must install the Interceptor CA certificate in your browser or system.
+        </p>
+        <div class="flex gap-4">
+          <Button variant="primary" @click="showCertGuide = true">
+            📖 Installation Guide
+          </Button>
+          <Button variant="secondary" @click="downloadCert">
+            ⬇️ Download Certificate
+          </Button>
+        </div>
+      </section>
+
       <!-- Security Settings -->
       <section class="panel bg-i3-bg-alt/50">
         <h3 class="text-lg font-bold text-i3-text mb-4 border-b border-i3-border pb-2">Security & Access Control</h3>
@@ -141,6 +176,69 @@ async function saveSettings() {
     <div class="mt-6 pt-4 border-t border-i3-border flex justify-end gap-4">
       <Button variant="secondary">Reset Defaults</Button>
       <Button id="save-btn" variant="primary" @click="saveSettings">Save Configuration</Button>
+    </div>
+  </div>
+
+  <!-- TLS Certificate Modal -->
+  <div v-if="showCertGuide" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50" @click.self="showCertGuide = false">
+    <div class="bg-i3-bg-alt border border-i3-border rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-i3-cyan">🔐 Install CA Certificate</h3>
+        <button @click="showCertGuide = false" class="text-i3-text-muted hover:text-i3-text">✕</button>
+      </div>
+
+      <div class="space-y-4 text-sm">
+        <p class="text-i3-text-secondary">
+          To intercept HTTPS traffic, you must install the Interceptor CA certificate in your browser or system.
+        </p>
+
+        <div class="bg-i3-bg p-4 rounded border border-i3-border">
+          <h4 class="font-bold text-i3-orange mb-2">📁 Step 1: Download the certificate</h4>
+          <Button variant="primary" @click="downloadCert" class="w-full">
+            ⬇️ Download interceptor-ca.pem
+          </Button>
+        </div>
+
+        <div class="bg-i3-bg p-4 rounded border border-i3-border">
+          <h4 class="font-bold text-i3-orange mb-2">🐧 Linux (Firefox)</h4>
+          <ol class="list-decimal list-inside space-y-1 text-i3-text-secondary">
+            <li>Open Firefox → Settings → Privacy & Security</li>
+            <li>Scroll to "Certificates" → View Certificates</li>
+            <li>Go to "Authorities" tab → Import</li>
+            <li>Select the downloaded <code class="text-i3-cyan">interceptor-ca.pem</code></li>
+            <li>Check "Trust this CA to identify websites"</li>
+          </ol>
+        </div>
+
+        <div class="bg-i3-bg p-4 rounded border border-i3-border">
+          <h4 class="font-bold text-i3-orange mb-2">🍎 macOS</h4>
+          <ol class="list-decimal list-inside space-y-1 text-i3-text-secondary">
+            <li>Double-click the downloaded certificate</li>
+            <li>Keychain Access will open → Add to "login" keychain</li>
+            <li>Find "Interceptor Proxy CA" in Keychain Access</li>
+            <li>Double-click → Trust → Set to "Always Trust"</li>
+          </ol>
+        </div>
+
+        <div class="bg-i3-bg p-4 rounded border border-i3-border">
+          <h4 class="font-bold text-i3-orange mb-2">🪟 Windows</h4>
+          <ol class="list-decimal list-inside space-y-1 text-i3-text-secondary">
+            <li>Double-click the certificate file</li>
+            <li>Click "Install Certificate" → Local Machine</li>
+            <li>Select "Place all certificates in the following store"</li>
+            <li>Browse → "Trusted Root Certification Authorities"</li>
+            <li>Finish and confirm the security warning</li>
+          </ol>
+        </div>
+
+        <div class="bg-i3-bg p-4 rounded border border-i3-cyan/30">
+          <h4 class="font-bold text-i3-cyan mb-2">⚠️ Security Note</h4>
+          <p class="text-i3-text-secondary">
+            This certificate allows Interceptor to decrypt HTTPS traffic. Only install it on systems you control
+            and <strong>remove it when not in use</strong> for auditing purposes.
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 </template>

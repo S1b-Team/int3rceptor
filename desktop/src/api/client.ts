@@ -5,8 +5,10 @@ const API_BASE_URL = "http://localhost:3000/api";
 
 class INT3RCEPTORClient {
     private client: AxiosInstance;
+    public readonly baseUrl: string;
 
     constructor(baseURL: string = API_BASE_URL) {
+        this.baseUrl = baseURL;
         this.client = axios.create({
             baseURL,
             timeout: 10000,
@@ -261,6 +263,22 @@ class INT3RCEPTORClient {
         });
         return response.data;
     }
+
+    // WebSocket API
+    async wsGetConnections(): Promise<WsConnection[]> {
+        const response = await this.client.get("/websocket/connections");
+        return response.data;
+    }
+
+    async wsGetFrames(connectionId: string): Promise<WsFrame[]> {
+        const response = await this.client.get(`/websocket/frames/${connectionId}`);
+        return response.data;
+    }
+
+    async wsClear() {
+        const response = await this.client.delete("/websocket/clear");
+        return response.data;
+    }
 }
 
 // Export singleton instance
@@ -390,4 +408,26 @@ export interface ScanStats {
     medium_count: number;
     low_count: number;
     info_count: number;
+}
+
+// WebSocket Types
+export interface WsConnection {
+    id: string;
+    url: string;
+    established_at: number;
+    closed_at: number | null;
+    frames_count: number;
+}
+
+export type WsFrameType = "Text" | "Binary" | "Ping" | "Pong" | "Close";
+export type WsDirection = "ClientToServer" | "ServerToClient";
+
+export interface WsFrame {
+    id: number;
+    connection_id: string;
+    timestamp: number;
+    direction: WsDirection;
+    frame_type: WsFrameType;
+    payload: number[];
+    masked: boolean;
 }
