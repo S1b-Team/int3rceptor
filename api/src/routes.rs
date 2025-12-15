@@ -20,7 +20,7 @@ use interceptor_core::comparer::{CompareRequest, Comparer};
 use interceptor_core::connection_pool::ProxyBody;
 use interceptor_core::encoding::{Encoder, TransformRequest};
 use interceptor_core::metrics;
-use interceptor_core::plugin::config::{PluginConfig, PluginPermissions};
+use interceptor_core::plugin::config::PluginConfig;
 use interceptor_core::rules::Rule;
 use reqwest::Client;
 use serde::Deserialize;
