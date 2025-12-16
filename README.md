@@ -10,7 +10,7 @@
 [![Matrix](https://img.shields.io/badge/matrix-chat-blueviolet.svg?style=for-the-badge&logo=matrix)](https://matrix.to/#/@ind4skylivey:matrix.org)
 [![GitHub Discussions](https://img.shields.io/badge/discussions-join-success.svg?style=for-the-badge&logo=github)](https://github.com/S1b-Team/int3rceptor/discussions)
 
-**A modern, high-performance security testing platform built with Rust and Vue.js**
+<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&duration=3000&pause=1000&color=00D4FF&center=true&vCenter=true&width=435&lines=Intercept+HTTP%2FHTTPS+%26+WebSocket;Rust-Powered+Performance+🚀;Modern+Vue.js+Interface+🎨;The+Burp+Suite+Alternative+🛡️" alt="Typing SVG" /></a>
 
 [Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing) • [Commercial License](#-commercial-licensing)
 
@@ -572,7 +572,7 @@ npm run dev
 ### How to Purchase
 
 📧 **Email**: s1bgr0up.root@gmail.com
-📄 **Details**: See [PRICING.md](../PRICING.md)
+📄 **Details**: See [PRICING.md](PRICING.md)
 
 ---
 
@@ -615,8 +615,12 @@ We welcome contributions! By contributing, you agree that:
 
 -   Built with ❤️ by [S1BGr0uP](https://github.com/S1BGr0uP)
 -   Inspired by Burp Suite, Mitmproxy, and Charles Proxy
--   Special thanks to the Rust and Vue.js communities
--   Contributors: See [CONTRIBUTORS.md](CONTRIBUTORS.md)
+
+### 👥 Contributors
+
+<a href="https://github.com/S1b-Team/int3rceptor/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=S1b-Team/int3rceptor" />
+</a>
 
 ---
 
@@ -657,5 +661,16 @@ We welcome contributions! By contributing, you agree that:
 **⭐ Star us on GitHub — it motivates us a lot!**
 
 Made with 🦀 Rust and 🖼️ Vue.js
+
+```text
+  _____ _   _ _______ ____  _____   _____ ______ _____ _______ ____  _____
+ |_   _| \ | |__   __|___ \|  __ \ / ____|  ____|  __ \__   __/ __ \|  __ \
+   | | |  \| |  | |    __) | |__) | |    | |__  | |__) | | | | |  | | |__) |
+   | | | . ` |  | |   |__ <|  _  /| |    |  __| |  ___/  | | | |  | |  _  /
+  _| |_| |\  |  | |   ___) | | \ \| |____| |____| |      | | | |__| | | \ \
+ |_____|_| \_|  |_|  |____/|_|  \_\\_____|______|_|      |_|  \____/|_|  \_\
+
+             >> HACK THE PLANET. SECURE THE FUTURE. <<
+```
 
 </div>
