@@ -656,8 +656,6 @@ We welcome contributions! By contributing, you agree that:
 
 **⭐ Star us on GitHub — it motivates us a lot!**
 
-[![Star History Chart](https://api.star-history.com/svg?repos=S1b-Team/int3rceptor&type=Date)](https://star-history.com/#S1b-Team/int3rceptor&Date)
-
 Made with 🦀 Rust and 🖼️ Vue.js
 
 </div>
