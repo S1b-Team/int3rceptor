@@ -485,7 +485,7 @@ npm run dev
 
 | Feature                    | Int3rceptor      | Burp Suite Pro | Winner                       |
 | :------------------------- | :--------------- | :------------- | :--------------------------- |
-| **Price**                  | **$999/year**    | $449/year      | 🏆 Int3rceptor (Premium)     |
+| **Price**                  | **$399/year**    | $449/year      | 🏆 Int3rceptor (11% cheaper) |
 | **Throughput**             | **15,234 req/s** | 2,145 req/s    | 🏆 Int3rceptor (7.1x faster) |
 | **Memory Usage**           | **45 MB**        | 512 MB         | 🏆 Int3rceptor (91% less)    |
 | **UI Technology**          | **Vue 3**        | Swing (legacy) | 🏆 Int3rceptor (modern)      |
@@ -548,11 +548,13 @@ npm run dev
 -   Audit logging
 -   Custom integrations
 
-#### 💼 **Professional License** - $999/year
+#### 💼 **Professional License** - $399/year
 
--   **Individual security testers** (1 user)
--   Commercial use allowed
--   Advanced scanner included
+-   **Commercial Use Allowed**
+-   **Advanced Scanner** (SQLi, XSS, etc.)
+-   **Unlimited Projects**
+-   **Priority Support**
+-   **Cloud Sync**ed scanner included
 -   Premium plugins access
 -   Email support (48h response)
 
