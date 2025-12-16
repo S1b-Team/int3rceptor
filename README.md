@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="1024" height="682" alt="project_banner" src="https://github.com/user-attachments/assets/9d940bcc-084b-4030-861e-bda4aafe15c5" />
+<img width="1024" height="682" alt="project_banner" src="assets/images/banner.png" />
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg?style=for-the-badge)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -484,25 +484,25 @@ npm run dev
 ### vs Burp Suite Pro
 
 | Feature                    | Int3rceptor      | Burp Suite Pro | Winner                       |
-| -------------------------- | ---------------- | -------------- | ---------------------------- |
+| :------------------------- | :--------------- | :------------- | :--------------------------- |
 | **Price**                  | **$999/year**    | $449/year      | 🏆 Int3rceptor (Premium)     |
 | **Throughput**             | **15,234 req/s** | 2,145 req/s    | 🏆 Int3rceptor (7.1x faster) |
 | **Memory Usage**           | **45 MB**        | 512 MB         | 🏆 Int3rceptor (91% less)    |
 | **UI Technology**          | **Vue 3**        | Swing (legacy) | 🏆 Int3rceptor (modern)      |
-| **WebSocket Interception** | **✅ Full**      | ❌ Limited     | 🏆 Int3rceptor               |
-| **Intruder Modes**         | ✅ 4 modes       | ✅ 4 modes     | 🤝 Tie                       |
-| **Scanner**                | ✅ Advanced      | ✅ Advanced    | 🤝 Tie                       |
-| **Collaborator**           | ❌ Planned       | ✅ Yes         | ⚠️ Burp Suite                |
-| **Extensions**             | ❌ Planned       | ✅ 1000+       | ⚠️ Burp Suite                |
+| **WebSocket Interception** | ✅ **Full**      | ❌ Limited     | 🏆 Int3rceptor               |
+| **Intruder Modes**         | ✅ **4 modes**   | ✅ 4 modes     | 🤝 Tie                       |
+| **Scanner**                | ✅ **Advanced**  | ✅ Advanced    | 🤝 Tie                       |
+| **Collaborator**           | ❌ **Planned**   | ✅ Yes         | ⚠️ Burp Suite                |
+| **Extensions**             | ❌ **Planned**   | ✅ 1000+       | ⚠️ Burp Suite                |
 
 ### vs Open Source Alternatives
 
 | Feature         | Int3rceptor                 | mitmproxy   | OWASP ZAP      |
-| --------------- | --------------------------- | ----------- | -------------- |
+| :-------------- | :-------------------------- | :---------- | :------------- |
 | **Language**    | Rust                        | Python      | Java           |
 | **UI**          | Vue 3 (Modern)              | CLI/Web     | Swing (Legacy) |
-| **Performance** | **15,234 req/s**            | 1,823 req/s | 1,654 req/s    |
-| **Memory**      | **45 MB**                   | 128 MB      | 687 MB         |
+| **Performance** | 15,234 req/s                | 1,823 req/s | 1,654 req/s    |
+| **Memory**      | 45 MB                       | 128 MB      | 687 MB         |
 | **Intruder**    | ✅ 4 modes                  | ❌          | ✅ Limited     |
 | **Rule Engine** | ✅ Advanced                 | ✅ Scripts  | ❌             |
 | **WebSocket**   | ✅ Full                     | ❌          | ✅ Basic       |
