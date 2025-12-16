@@ -368,44 +368,55 @@ sudo update-ca-certificates
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (Vue 3 + TypeScript)             │
-│  ┌──────────┬──────────┬──────────┬──────────┬──────────┐  │
-│  │ Traffic  │  Rules   │  Scope   │ Repeater │ Intruder │  │
-│  └──────────┴──────────┴──────────┴──────────┴──────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                            ▲
-                            │ REST API + WebSocket
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      API Layer (Axum)                        │
-│  /api/requests  /api/rules  /api/scope  /api/intruder      │
-└─────────────────────────────────────────────────────────────┘
-                            ▲
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Core Engine (Rust + Tokio)                │
-│  ┌──────────┬──────────┬──────────┬──────────┬──────────┐  │
-│  │  Proxy   │  Rules   │  Scope   │ Intruder │   TLS    │  │
-│  │  Server  │  Engine  │ Manager  │          │   MITM   │  │
-│  └──────────┴──────────┴──────────┴──────────┴──────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                            ▲
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │    SQLite     │
-                    └───────────────┘
+```mermaid
+graph TD
+    User[👤 User] -->|HTTP/HTTPS| Proxy[🛡️ Proxy Core]
+
+    subgraph Frontend [🎨 Frontend UI]
+        Traffic[📊 Traffic]
+        Rules[🔧 Rules]
+        Repeater[🔄 Repeater]
+        Intruder[🎯 Intruder]
+    end
+
+    subgraph Backend [🦀 Rust Core]
+        Proxy -->|Intercept| Engine[⚙️ Rule Engine]
+        Proxy -->|Analyze| Scope[🎯 Scope Manager]
+        Proxy -->|Decrypt| MITM[🔐 TLS MITM]
+
+        Engine -->|WebSocket| API[🔌 API Layer]
+        Scope -->|Filter| API
+    end
+
+    API <-->|JSON/WebSocket| Frontend
+    Backend -->|Persist| DB[(💾 SQLite DB)]
 ```
 
-### Technology Stack
+### 📂 Project Structure
 
--   **Backend**: Rust, Tokio, Hyper, Axum, Rustls
--   **Frontend**: Vue 3, TypeScript, Vite, Axios
--   **Database**: SQLite
--   **Build**: Cargo, npm
+```text
+📦 int3rceptor
+├── 🦀 core             # Rust backend & proxy engine
+│   ├── src/proxy       # Traffic interception logic
+│   ├── src/engine      # Rule processing engine
+│   └── src/tls         # Certificate management
+├── 🎨 ui               # Vue 3 frontend
+│   ├── src/views       # Traffic, Repeater, Intruder views
+│   └── src/stores      # Pinia state management
+├── 🚀 desktop          # Tauri wrapper (v2.0)
+└── 📜 docs             # Documentation & specs
+```
+
+### 🛠️ Tech Stack
+
+| Component | Technology | Badge                                                                                                              |
+| :-------- | :--------- | :----------------------------------------------------------------------------------------------------------------- |
+| **Core**  | **Rust**   | ![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)             |
+| **Async** | **Tokio**  | ![Tokio](https://img.shields.io/badge/tokio-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)           |
+| **Web**   | **Axum**   | ![Axum](https://img.shields.io/badge/axum-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)             |
+| **UI**    | **Vue 3**  | ![Vue.js](https://img.shields.io/badge/vue.js-%2335495e.svg?style=for-the-badge&logo=vuedotjs&logoColor=%234FC08D) |
+| **Build** | **Vite**   | ![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)             |
+| **DB**    | **SQLite** | ![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white)       |
 
 ---
 
@@ -540,7 +551,7 @@ npm run dev
 -   SLA guarantees
 -   Dedicated support engineer
 
-#### 🏢 **Business License** - $2,499/year
+#### 🏢 **Business License** - $1,199/year
 
 -   **Small Teams** (up to 5 users)
 -   Priority support (24h response)
@@ -554,7 +565,7 @@ npm run dev
 -   **Advanced Scanner** (SQLi, XSS, etc.)
 -   **Unlimited Projects**
 -   **Priority Support**
--   **Cloud Sync**ed scanner included
+-   **Cloud Sync**
 -   Premium plugins access
 -   Email support (48h response)
 
@@ -644,6 +655,8 @@ We welcome contributions! By contributing, you agree that:
 <div align="center">
 
 **⭐ Star us on GitHub — it motivates us a lot!**
+
+[![Star History Chart](https://api.star-history.com/svg?repos=S1b-Team/int3rceptor&type=Date)](https://star-history.com/#S1b-Team/int3rceptor&Date)
 
 Made with 🦀 Rust and 🖼️ Vue.js
 
