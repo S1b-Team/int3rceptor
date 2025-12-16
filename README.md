@@ -616,12 +616,6 @@ We welcome contributions! By contributing, you agree that:
 -   Built with ❤️ by [S1BGr0uP](https://github.com/S1BGr0uP)
 -   Inspired by Burp Suite, Mitmproxy, and Charles Proxy
 
-### 👥 Contributors
-
-<a href="https://github.com/S1b-Team/int3rceptor/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=S1b-Team/int3rceptor" />
-</a>
-
 ---
 
 ## 📞 Support
