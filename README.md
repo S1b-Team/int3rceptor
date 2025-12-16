@@ -10,7 +10,7 @@
 [![Matrix](https://img.shields.io/badge/matrix-chat-blueviolet.svg?style=for-the-badge&logo=matrix)](https://matrix.to/#/@ind4skylivey:matrix.org)
 [![GitHub Discussions](https://img.shields.io/badge/discussions-join-success.svg?style=for-the-badge&logo=github)](https://github.com/S1b-Team/int3rceptor/discussions)
 
-<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&duration=3000&pause=1000&color=00D4FF&center=true&vCenter=true&width=435&lines=Intercept+HTTP%2FHTTPS+%26+WebSocket;Rust-Powered+Performance+🚀;Modern+Vue.js+Interface+🎨;The+Burp+Suite+Alternative+🛡️" alt="Typing SVG" /></a>
+<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&duration=3000&pause=1000&color=00D4FF&center=true&vCenter=true&width=435&lines=Int3rceptor+HTTP%2FHTTPS+%26+WebSocket;Rust-Powered+Performance+🚀;Modern+Vue.js+Interface+🎨;The+Burp+Suite+Alternative+🛡️" alt="Typing SVG" /></a>
 
 [Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing) • [Commercial License](#-commercial-licensing)
 
