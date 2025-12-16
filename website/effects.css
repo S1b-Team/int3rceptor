@@ -1,0 +1,307 @@
+/* ==============================================
+   VISUAL EFFECTS & ANIMATIONS
+   ============================================== */
+
+/* Smooth Scroll */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Slide Up Animation */
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Glow Pulse Animation */
+@keyframes glowPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px var(--primary-glow);
+    }
+    50% {
+        box-shadow: 0 0 40px var(--primary-glow), 0 0 60px var(--primary-glow);
+    }
+}
+
+/* Gradient Shift Animation */
+@keyframes gradientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Floating Animation */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* ==============================================
+   APPLY ANIMATIONS TO ELEMENTS
+   ============================================== */
+
+/* Pricing Cards - REMOVED backwards to prevent invisible content */
+.pricing-card {
+    animation: fadeIn 0.6s ease-out;
+    opacity: 1; /* Ensure visible by default */
+}
+
+.pricing-card:nth-child(1) { animation-delay: 0.1s; }
+.pricing-card:nth-child(2) { animation-delay: 0.2s; }
+.pricing-card:nth-child(3) { animation-delay: 0.3s; }
+.pricing-card:nth-child(4) { animation-delay: 0.4s; }
+
+/* Feature Cards */
+.feature-card {
+    animation: slideUp 0.8s ease-out;
+    opacity: 1; /* Ensure visible by default */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:nth-child(1) { animation-delay: 0.1s; }
+.feature-card:nth-child(2) { animation-delay: 0.2s; }
+.feature-card:nth-child(3) { animation-delay: 0.3s; }
+.feature-card:nth-child(4) { animation-delay: 0.4s; }
+.feature-card:nth-child(5) { animation-delay: 0.5s; }
+.feature-card:nth-child(6) { animation-delay: 0.6s; }
+
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 10px 40px rgba(0, 245, 255, 0.3);
+}
+
+/* Plugin Cards */
+.plugin-card {
+    animation: fadeIn 0.7s ease-out;
+    opacity: 1;
+}
+
+.plugin-card:nth-child(1) { animation-delay: 0.2s; }
+.plugin-card:nth-child(2) { animation-delay: 0.4s; }
+
+/* Titles with Gradient Animation */
+.pricing-title, .section-title {
+    background: linear-gradient(
+        135deg,
+        var(--primary),
+        var(--secondary),
+        var(--primary)
+    );
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 4s ease infinite;
+}
+
+/* Override for better visibility */
+.pricing-title {
+    color: var(--text-primary);
+    -webkit-text-fill-color: var(--text-primary);
+    background: none;
+    animation: none;
+}
+
+.section-title {
+    background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Hero Stats */
+.hero-stats {
+    animation: fadeIn 1s ease-out 0.5s;
+    opacity: 1;
+}
+
+.stat-card {
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: scale(1.05);
+}
+
+/* Buttons Glow Effect */
+.btn-primary {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn-primary:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.btn-primary:hover {
+    animation: glowPulse 1.5s ease-in-out infinite;
+}
+
+/* Featured Badge Pulse */
+.featured-badge {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* Navbar on Scroll */
+.navbar {
+    transition: background 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+.navbar.scrolled {
+    background: rgba(10, 15, 25, 0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 245, 255, 0.1);
+}
+
+/* Logo Glow */
+.logo:hover {
+    filter: drop-shadow(0 0 10px var(--primary));
+    transition: filter 0.3s ease;
+}
+
+/* Section Fade In on Scroll - DISABLED to ensure visibility */
+.pricing-section {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.pricing-section.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* CTA Visual Float */
+.cta-visual-img {
+    animation: float 4s ease-in-out infinite;
+}
+
+/* Tier Features List Items - visible by default */
+.tier-features li {
+    opacity: 1;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.tier-features li:nth-child(1) { animation-delay: 0.1s; }
+.tier-features li:nth-child(2) { animation-delay: 0.15s; }
+.tier-features li:nth-child(3) { animation-delay: 0.2s; }
+.tier-features li:nth-child(4) { animation-delay: 0.25s; }
+.tier-features li:nth-child(5) { animation-delay: 0.3s; }
+.tier-features li:nth-child(6) { animation-delay: 0.35s; }
+.tier-features li:nth-child(7) { animation-delay: 0.4s; }
+.tier-features li:nth-child(8) { animation-delay: 0.45s; }
+
+/* Plugin Name Glow on Hover */
+.plugin-name {
+    transition: filter 0.3s ease;
+}
+
+.plugin-card:hover .plugin-name {
+    filter: drop-shadow(0 0 15px var(--primary));
+}
+
+/* Billing Selector Glow */
+.billing-dropdown:focus {
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* FAQ Items */
+.faq-item {
+    animation: fadeIn 0.6s ease-out backwards;
+}
+
+.faq-item:nth-child(1) { animation-delay: 0.1s; }
+.faq-item:nth-child(2) { animation-delay: 0.2s; }
+.faq-item:nth-child(3) { animation-delay: 0.3s; }
+.faq-item:nth-child(4) { animation-delay: 0.4s; }
+.faq-item:nth-child(5) { animation-delay: 0.5s; }
+.faq-item:nth-child(6) { animation-delay: 0.6s; }
+
+/* Hero CTA Buttons */
+.hero-cta .btn {
+    animation: fadeIn 1s ease-out 0.8s backwards;
+}
+
+.hero-cta .btn:nth-child(1) { animation-delay: 0.9s; }
+.hero-cta .btn:nth-child(2) { animation-delay: 1s; }
+
+/* Text Selection Glow */
+::selection {
+    background: var(--primary);
+    color: var(--bg-primary);
+    text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+}
+
+/* Link Underline Animation */
+a:not(.btn) {
+    position: relative;
+    transition: color 0.3s ease;
+}
+
+a:not(.btn)::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--primary);
+    transition: width 0.3s ease;
+}
+
+a:not(.btn):hover::after {
+    width: 100%;
+}
+
+/* Reduce Motion for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

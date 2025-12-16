@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - INT3RCEPTOR</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../pricing/pricing.css">
+    <link rel="stylesheet" href="../effects.css">
+    <style>
+        .checkout-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 3rem;
+        }
+
+        .checkout-form {
+            background: var(--bg-tertiary);
+            padding: 2.5rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-section {
+            margin-bottom: 2.5rem;
+        }
+
+        .form-section h3 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 245, 255, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .order-summary {
+            background: var(--bg-tertiary);
+            padding: 2.5rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            height: fit-content;
+            position: sticky;
+            top: 2rem;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-total {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 2px solid var(--primary);
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .payment-methods {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .payment-method {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .payment-method:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .payment-method.active {
+            border-color: var(--primary);
+            background: rgba(0, 245, 255, 0.1);
+        }
+
+        .payment-method img {
+            height: 30px;
+            margin-bottom: 0.5rem;
+        }
+
+        .secure-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 968px) {
+            .checkout-container {
+                grid-template-columns: 1fr;
+            }
+
+            .order-summary {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">S1<span class="logo-accent">b</span></span>
+                <span class="logo-bracket">]</span>
+            </a>
+        </div>
+    </nav>
+
+    <section class="pricing-hero">
+        <div class="container">
+            <h1 class="pricing-title">Secure Checkout</h1>
+            <p class="pricing-subtitle">Complete your purchase securely</p>
+        </div>
+    </section>
+
+    <div class="checkout-container">
+        <!-- Checkout Form -->
+        <div class="checkout-form">
+            <form id="checkout-form">
+                <!-- Contact Information -->
+                <div class="form-section">
+                    <h3>📧 Contact Information</h3>
+                    <div class="form-group">
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" name="email" required placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="name">Full Name *</label>
+                        <input type="text" id="name" name="name" required placeholder="John Doe">
+                    </div>
+                </div>
+
+                <!-- Company Information (Optional) -->
+                <div class="form-section">
+                    <h3>🏢 Company Information (Optional)</h3>
+                    <div class="form-group">
+                        <label for="company">Company Name</label>
+                        <input type="text" id="company" name="company" placeholder="Your Company Inc.">
+                    </div>
+                    <div class="form-group">
+                        <label for="vat">VAT/Tax ID</label>
+                        <input type="text" id="vat" name="vat" placeholder="EU123456789">
+                    </div>
+                </div>
+
+                <!-- Billing Address -->
+                <div class="form-section">
+                    <h3>📍 Billing Address</h3>
+                    <div class="form-group">
+                        <label for="country">Country *</label>
+                        <select id="country" name="country" required>
+                            <option value="">Select Country</option>
+                            <option value="US">United States</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="DE">Germany</option>
+                            <option value="FR">France</option>
+                            <option value="ES">Spain</option>
+                            <option value="CA">Canada</option>
+                            <option value="AU">Australia</option>
+                            <option value="MX">Mexico</option>
+                            <option value="BR">Brazil</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="city">City *</label>
+                            <input type="text" id="city" name="city" required placeholder="San Francisco">
+                        </div>
+                        <div class="form-group">
+                            <label for="postal">Postal Code *</label>
+                            <input type="text" id="postal" name="postal" required placeholder="94103">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Method -->
+                <div class="form-section">
+                    <h3>💳 Payment Method</h3>
+                    <div class="payment-methods">
+                        <div class="payment-method active" data-method="stripe">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">💳</div>
+                            <div style="color: var(--text-primary); font-weight: 600;">Credit Card</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">Stripe</div>
+                        </div>
+                        <div class="payment-method" data-method="paypal">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">💰</div>
+                            <div style="color: var(--text-primary); font-weight: 600;">PayPal</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">Fast & Secure</div>
+                        </div>
+                        <div class="payment-method" data-method="crypto">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">₿</div>
+                            <div style="color: var(--text-primary); font-weight: 600;">Crypto</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">BTC/ETH</div>
+                        </div>
+                        <div class="payment-method" data-method="bank">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🏦</div>
+                            <div style="color: var(--text-primary); font-weight: 600;">Bank Transfer</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">SEPA/Wire</div>
+                        </div>
+                    </div>
+
+                    <div class="secure-badge">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M8 1L3 3V7C3 10.866 5.686 14.166 8 15C10.314 14.166 13 10.866 13 7V3L8 1Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Secured by 256-bit SSL encryption</span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 2rem; font-size: 1.125rem; padding: 1rem;">
+                    Complete Purchase →
+                </button>
+
+                <p style="text-align: center; color: var(--text-muted); font-size: 0.875rem; margin-top: 1rem;">
+                    By completing this purchase, you agree to our
+                    <a href="../terms/index.html" style="color: var(--primary);">Terms of Service</a>
+                </p>
+            </form>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="order-summary">
+            <h3 style="color: var(--primary); margin-bottom: 1.5rem; font-size: 1.5rem;">Order Summary</h3>
+
+            <div class="summary-item">
+                <div>
+                    <div style="color: var(--text-primary); font-weight: 600;">INT3RCEPTOR Professional</div>
+                    <div style="color: var(--text-muted); font-size: 0.875rem;">Annual Subscription</div>
+                </div>
+                <div style="color: var(--text-primary); font-weight: 600;">$399.00</div>
+            </div>
+
+            <div class="summary-item">
+                <div style="color: var(--text-secondary);">Subtotal</div>
+                <div style="color: var(--text-primary);">$399.00</div>
+            </div>
+
+            <div class="summary-item">
+                <div style="color: var(--text-secondary);">
+                    Tax (VAT)
+                    <span style="font-size: 0.75rem; color: var(--text-muted);"> • Calculated at checkout</span>
+                </div>
+                <div style="color: var(--text-primary);">$0.00</div>
+            </div>
+
+            <div class="summary-total">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Total</span>
+                    <span>$399.00</span>
+                </div>
+                <div style="font-size: 0.875rem; font-weight: 400; color: var(--text-muted); margin-top: 0.5rem;">
+                    Billed annually • Auto-renews
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(0, 245, 255, 0.1); border-radius: 0.5rem; border-left: 3px solid var(--primary);">
+                <div style="color: var(--primary); font-weight: 600; margin-bottom: 0.5rem;">✅ What's Included:</div>
+                <ul style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.8; margin-left: 1.5rem;">
+                    <li>Advanced Intruder/Fuzzer</li>
+                    <li>Premium Plugins Access</li>
+                    <li>Priority Support</li>
+                    <li>Commercial License</li>
+                    <li>All Future Updates</li>
+                </ul>
+            </div>
+
+            <div style="margin-top: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.875rem;">
+                <div style="margin-bottom: 0.5rem;">💯 30-Day Money-Back Guarantee</div>
+                <div>🔒 Secure Payment Processing</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Payment method selection
+        document.querySelectorAll('.payment-method').forEach(method => {
+            method.addEventListener('click', function() {
+                document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Form submission (placeholder - integrate with Stripe/PayPal)
+        document.getElementById('checkout-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const selectedMethod = document.querySelector('.payment-method.active').dataset.method;
+
+            alert(`Payment processing with ${selectedMethod} will be implemented here.\n\nFor now, this redirects to contact email.`);
+
+            // Redirect to contact for now
+            window.location.href = 'mailto:livey_sh13lds1b33@keemail.me?subject=INT3RCEPTOR Purchase&body=I would like to purchase INT3RCEPTOR Professional.';
+        });
+    </script>
+</body>
+</html>

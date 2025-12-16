@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download INT3RCEPTOR - S1b Team</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../pricing/pricing.css">
+    <link rel="stylesheet" href="../effects.css">
+    <style>
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .os-card {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 2.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .os-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-8px);
+            box-shadow: 0 10px 40px rgba(0, 245, 255, 0.3);
+        }
+
+        .os-logo {
+            font-size: 5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .os-name {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .os-description {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .download-info {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-top: 2rem;
+            border-left: 3px solid var(--primary);
+        }
+
+        .installation-section {
+            margin-top: 4rem;
+            padding: 3rem;
+            background: var(--bg-tertiary);
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-block {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">S1<span class="logo-accent">b</span></span>
+                <span class="logo-bracket">]</span>
+            </a>
+
+            <ul class="nav-menu">
+                <li><a href="../index.html#features">Features</a></li>
+                <li><a href="../pricing/index.html">Pricing</a></li>
+                <li><a href="../docs/index.html">Docs</a></li>
+                <li><a href="../pricing/index.html#plugins-pricing">Plugins</a></li>
+                <li><a href="https://github.com/S1b-Team" target="_blank">GitHub</a></li>
+            </ul>
+
+            <div class="nav-cta">
+                <a href="index.html" class="btn btn-secondary">Download</a>
+                <a href="../pricing/index.html" class="btn btn-primary">Go Pro</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="pricing-hero">
+        <div class="container">
+            <h1 class="pricing-title">Download INT3RCEPTOR</h1>
+            <p class="pricing-subtitle">Free and open source • Available for all platforms</p>
+        </div>
+    </section>
+
+    <section class="pricing-section">
+        <div class="container">
+
+            <!-- OS Download Cards -->
+            <div class="download-grid">
+
+                <!-- Linux -->
+                <div class="os-card">
+                    <div class="os-logo">🐧</div>
+                    <h2 class="os-name">Linux</h2>
+                    <p class="os-description">
+                        AppImage, DEB, RPM, and Arch packages available
+                    </p>
+                    <a href="https://github.com/S1b-Team/int3rceptor/releases/latest" target="_blank" class="btn btn-primary btn-block">
+                        Download for Linux
+                    </a>
+                    <div class="code-block" style="margin-top: 1.5rem; text-align: left;">
+                        <code style="color: var(--primary);">curl -fsSL https://install.s1b.team/int3rceptor.sh | sh</code>
+                    </div>
+                </div>
+
+                <!-- macOS -->
+                <div class="os-card">
+                    <div class="os-logo">🍎</div>
+                    <h2 class="os-name">macOS</h2>
+                    <p class="os-description">
+                        Universal binary for Intel and Apple Silicon
+                    </p>
+                    <a href="https://github.com/S1b-Team/int3rceptor/releases/latest" target="_blank" class="btn btn-primary btn-block">
+                        Download for macOS
+                    </a>
+                    <div class="code-block" style="margin-top: 1.5rem; text-align: left;">
+                        <code style="color: var(--primary);">brew install s1b-team/tap/int3rceptor</code>
+                    </div>
+                </div>
+
+                <!-- Windows -->
+                <div class="os-card">
+                    <div class="os-logo">🪟</div>
+                    <h2 class="os-name">Windows</h2>
+                    <p class="os-description">
+                        MSI installer and portable executable available
+                    </p>
+                    <a href="https://github.com/S1b-Team/int3rceptor/releases/latest" target="_blank" class="btn btn-primary btn-block">
+                        Download for Windows
+                    </a>
+                    <div class="code-block" style="margin-top: 1.5rem; text-align: left;">
+                        <code style="color: var(--primary);">iwr https://install.s1b.team/int3rceptor.ps1 -useb | iex</code>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Installation Info -->
+            <div class="installation-section">
+                <h2 style="color: var(--primary); margin-bottom: 2rem;">📦 Installation Instructions</h2>
+
+                <h3 style="color: var(--text-primary); margin-top: 2rem; margin-bottom: 1rem;">🐧 Linux</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    <strong>AppImage (Universal):</strong> Download, make executable, and run:
+                </p>
+                <div class="code-block">
+                    <code style="color: var(--primary);">chmod +x INT3RCEPTOR-*.AppImage<br>./INT3RCEPTOR-*.AppImage</code>
+                </div>
+
+                <p style="color: var(--text-secondary); margin-bottom: 1rem; margin-top: 1.5rem;">
+                    <strong>Debian/Ubuntu:</strong>
+                </p>
+                <div class="code-block">
+                    <code style="color: var(--primary);">sudo dpkg -i int3rceptor_*.deb<br>sudo apt-get install -f</code>
+                </div>
+
+                <p style="color: var(--text-secondary); margin-bottom: 1rem; margin-top: 1.5rem;">
+                    <strong>Arch Linux:</strong>
+                </p>
+                <div class="code-block">
+                    <code style="color: var(--primary);">yay -S int3rceptor</code>
+                </div>
+
+                <h3 style="color: var(--text-primary); margin-top: 3rem; margin-bottom: 1rem;">🍎 macOS</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    <strong>Homebrew (Recommended):</strong>
+                </p>
+                <div class="code-block">
+                    <code style="color: var(--primary);">brew install s1b-team/tap/int3rceptor</code>
+                </div>
+
+                <p style="color: var(--text-secondary); margin-bottom: 1rem; margin-top: 1.5rem;">
+                    <strong>Manual Installation:</strong> Download the DMG, open it, and drag INT3RCEPTOR to Applications.
+                </p>
+
+                <h3 style="color: var(--text-primary); margin-top: 3rem; margin-bottom: 1rem;">🪟 Windows</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    <strong>MSI Installer (Recommended):</strong> Download and run the installer. Follow the setup wizard.
+                </p>
+
+                <p style="color: var(--text-secondary); margin-bottom: 1rem; margin-top: 1.5rem;">
+                    <strong>PowerShell:</strong>
+                </p>
+                <div class="code-block">
+                    <code style="color: var(--primary);">iwr https://install.s1b.team/int3rceptor.ps1 -useb | iex</code>
+                </div>
+
+                <div style="margin-top: 3rem; padding: 1.5rem; background: rgba(0, 245, 255, 0.1); border-left: 3px solid var(--primary); border-radius: 0.5rem;">
+                    <p style="color: var(--text-secondary); margin: 0;">
+                        <strong style="color: var(--primary);">📚 Need Help?</strong> Check out our
+                        <a href="../docs/index.html" style="color: var(--primary);">documentation</a>
+                        for detailed installation and setup guides, or visit our
+                        <a href="https://github.com/S1b-Team/int3rceptor/releases" target="_blank" style="color: var(--primary);">GitHub Releases page</a>.
+                    </p>
+                </div>
+            </div>
+
+            <!-- System Requirements -->
+            <div style="margin-top: 3rem; padding: 2.5rem; background: var(--bg-tertiary); border-radius: 1rem; border: 1px solid var(--border-color);">
+                <h2 style="color: var(--primary); margin-bottom: 2rem;">⚙️ System Requirements</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+                    <div>
+                        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Minimum</h4>
+                        <ul style="color: var(--text-secondary); line-height: 1.8;">
+                            <li>2 GB RAM</li>
+                            <li>200 MB disk space</li>
+                            <li>Modern web browser</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Recommended</h4>
+                        <ul style="color: var(--text-secondary); line-height: 1.8;">
+                            <li>4+ GB RAM</li>
+                            <li>1 GB disk space</li>
+                            <li>Chrome/Firefox latest</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 S1b Team. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

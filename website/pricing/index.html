@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - S1b INT3RCEPTOR</title>
+    <meta name="description" content="INT3RCEPTOR pricing: Free for personal use, Professional from $999/year. Premium plugins available.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Reuse landing styles -->
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="pricing.css">
+    <link rel="stylesheet" href="../effects.css">
+</head>
+<body>
+    <!-- Navigation (same as landing) -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <div class="logo">
+                    <a href="../index.html">
+                        <span class="logo-bracket">[</span>
+                        <span class="logo-text">S1<span class="logo-accent">b</span></span>
+                        <span class="logo-bracket">]</span>
+                    </a>
+                </div>
+            </div>
+
+            <ul class="nav-menu">
+                <li><a href="../index.html#features">Features</a></li>
+                <li><a href="index.html" class="active">Pricing</a></li>
+                <li><a href="../docs/index.html">Docs</a></li>
+                <li><a href="../index.html#plugins">Plugins</a></li>
+                <li><a href="https://github.com/S1b-Team" target="_blank">GitHub</a></li>
+            </ul>
+
+            <div class="nav-cta">
+                <a href="../download/index.html" class="btn btn-secondary">Download</a>
+                <a href="#pricing-plans" class="btn btn-primary">Go Pro</a>
+            </div>
+
+            <button class="nav-toggle" aria-label="Toggle navigation">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Pricing Hero -->
+    <section class="pricing-hero">
+        <div class="container">
+            <div class="pricing-hero-content">
+                <h1 class="pricing-title">Simple, Transparent Pricing</h1>
+                <p class="pricing-subtitle">
+                    Start free for personal use. Upgrade when you need commercial features.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- INT3RCEPTOR Pricing -->
+    <section id="pricing-plans" class="pricing-section">
+        <div class="container">
+            <div class="pricing-header">
+                <h2 class="section-title">INT3RCEPTOR</h2>
+                <p class="section-subtitle">Professional Security Testing Platform</p>
+
+                <!-- Billing Period Selector -->
+                <div class="billing-selector">
+                    <label for="billing-period">Billing Period:</label>
+                    <select id="billing-period" class="billing-dropdown">
+                        <option value="1month">1 Month (One-time) - $59</option>
+                        <option value="3months">3 Months (One-time) - Save 17%</option>
+                        <option value="monthly">Monthly Subscription - $49/mo (Auto-renew)</option>
+                        <option value="annual" selected>Annual Subscription - Save 33% ⭐ (Auto-renew)</option>
+                    </select>
+                </div>
+                <p class="billing-note">
+                    💡 <strong>Note:</strong> Subscriptions auto-renew automatically. One-time payments do not renew.
+                </p>
+            </div>
+
+            <div class="pricing-grid">
+                <!-- Free Tier -->
+                <div class="pricing-card">
+                    <div class="pricing-card-header">
+                        <h3 class="tier-name">Free</h3>
+                        <div class="tier-price">
+                            <span class="price">$0</span>
+                            <span class="period">/forever</span>
+                        </div>
+                        <p class="tier-description">Perfect for personal projects and learning</p>
+                    </div>
+
+                    <ul class="tier-features">
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>All core features</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>HTTP/2 support</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Request capture & replay</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Basic intruder</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Community support</li>
+                        <li class="disabled"><svg class="x-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5L15 15M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Commercial use</li>
+                    </ul>
+
+                    <a href="https://github.com/S1b-Team/int3rceptor/releases/latest" target="_blank" class="btn btn-secondary btn-block">Download Free</a>
+                </div>
+
+                <!-- Professional Tier -->
+                <div class="pricing-card featured">
+                    <div class="featured-badge">Most Popular</div>
+                    <div class="pricing-card-header">
+                        <h3 class="tier-name">Professional</h3>
+                        <div class="tier-price">
+                            <span class="price"
+                                  data-1month="59"
+                                  data-3months="149"
+                                  data-monthly="49"
+                                  data-annual="399">$399</span>
+                            <span class="period"
+                                  data-1month="/month"
+                                  data-3months="/3 months"
+                                  data-monthly="/month"
+                                  data-annual="/year">/year</span>
+                        </div>
+                        <p class="tier-description">For professional security testers</p>
+                    </div>
+
+                    <ul class="tier-features">
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Everything in Free</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Commercial use</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Advanced scanner</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Premium plugins</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Email support</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>1 user license</li>
+                    </ul>
+
+                    <a href="../checkout/index.html?tier=professional" class="btn btn-primary btn-block">Buy Now</a>
+                </div>
+
+                <!-- Business Tier -->
+                <div class="pricing-card">
+                    <div class="pricing-card-header">
+                        <h3 class="tier-name">Business</h3>
+                        <div class="tier-price">
+                            <span class="price"
+                                  data-1month="179"
+                                  data-3months="449"
+                                  data-monthly="149"
+                                  data-annual="1199">$1,199</span>
+                            <span class="period"
+                                  data-1month="/month"
+                                  data-3months="/3 months"
+                                  data-monthly="/month"
+                                  data-annual="/year">/year</span>
+                        </div>
+                        <p class="tier-description">For small teams (5 users)</p>
+                    </div>
+
+                    <ul class="tier-features">
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Everything in Professional</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>5 user licenses</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Priority support</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Team collaboration</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Audit logging</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Custom integrations</li>
+                    </ul>
+
+                    <a href="../checkout/index.html?tier=business" class="btn btn-primary btn-block">Buy Now</a>
+                </div>
+
+                <!-- Enterprise Tier -->
+                <div class="pricing-card">
+                    <div class="pricing-card-header">
+                        <h3 class="tier-name">Enterprise</h3>
+                        <div class="tier-price">
+                            <span class="price"
+                                  data-1month="359"
+                                  data-3months="899"
+                                  data-monthly="299"
+                                  data-annual="2399">$2,399</span>
+                            <span class="period"
+                                  data-1month="/month"
+                                  data-3months="/3 months"
+                                  data-monthly="/month"
+                                  data-annual="/year">/year</span>
+                        </div>
+                        <p class="tier-description">For large organizations</p>
+                    </div>
+
+                    <ul class="tier-features">
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Everything in Business</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Unlimited users</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Phone support 24/7</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>On-premise deployment</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>SLA guarantees</li>
+                        <li><svg class="check-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.6 5L7.5 14.1L3.4 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Dedicated support engineer</li>
+                    </ul>
+
+                    <a href="../checkout/index.html?tier=enterprise" class="btn btn-primary btn-block">Buy Now</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Premium Plugins Pricing -->
+    <section id="plugins-pricing" class="pricing-section plugins-pricing">
+        <div class="container">
+            <div class="pricing-header">
+                <h2 class="section-title">Premium Plugins</h2>
+                <p class="section-subtitle">Extend INT3RCEPTOR with powerful add-ons</p>
+            </div>
+
+            <div class="plugins-grid">
+                <!-- EDICT Plugin -->
+                <div id="edict" class="plugin-card">
+                    <div class="plugin-header">
+                        <h3 class="plugin-name">EDICT</h3>
+                        <p class="plugin-tagline">PKI & Certificate Authority</p>
+                    </div>
+
+                    <div class="plugin-features">
+                        <p>Advanced PKI management, custom certificate generation, and CA tools for security testing</p>
+                    </div>
+
+                    <div class="plugin-pricing">
+                        <div class="plugin-tier">
+                            <span class="tier-label">Standard</span>
+                            <span class="tier-price">$299/year</span>
+                        </div>
+                        <div class="plugin-tier">
+                            <span class="tier-label">Enterprise</span>
+                            <span class="tier-price">$2,999/year</span>
+                        </div>
+                        <div class="plugin-tier">
+                            <span class="tier-label">Perpetual</span>
+                            <span class="tier-price">$1,499 one-time</span>
+                        </div>
+                    </div>
+
+                    <a href="../checkout/index.html?tier=edict" class="btn btn-primary btn-block">Buy EDICT</a>
+                </div>
+
+                <!-- MYRMIDON Plugin -->
+                <div id="myrmidon" class="plugin-card">
+                    <div class="plugin-header">
+                        <h3 class="plugin-name">MYRMIDON</h3>
+                        <p class="plugin-tagline">Orchestration & Control Plane</p>
+                    </div>
+
+                    <div class="plugin-features">
+                        <p>Distributed testing orchestration, multi-node coordination, and advanced automation workflows</p>
+                    </div>
+
+                    <div class="plugin-pricing">
+                        <div class="plugin-tier">
+                            <span class="tier-label">Standard</span>
+                            <span class="tier-price">$499/year</span>
+                        </div>
+                        <div class="plugin-tier">
+                            <span class="tier-label">Enterprise</span>
+                            <span class="tier-price">$4,999/year</span>
+                        </div>
+                        <div class="plugin-tier">
+                            <span class="tier-label">Perpetual</span>
+                            <span class="tier-price">$2,499 one-time</span>
+                        </div>
+                    </div>
+
+                    <a href="../checkout/index.html?tier=myrmidon" class="btn btn-primary btn-block">Buy MYRMIDON</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="container">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3 class="faq-question">Can I use INT3RCEPTOR for free?</h3>
+                    <p class="faq-answer">Yes! INT3RCEPTOR is free for personal and educational use. You only need a paid license for commercial projects.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">What payment methods do you accept?</h3>
+                    <p class="faq-answer">We accept credit cards, PayPal, and wire transfers for Enterprise customers.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">Can I upgrade or downgrade my plan?</h3>
+                    <p class="faq-answer">Yes, you can change your plan at any time. Upgrades are prorated, downgrades take effect at the next renewal.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">What's your refund policy?</h3>
+                    <p class="faq-answer">We offer a 30-day money-back guarantee on all plans. No questions asked.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">Do you offer discounts for students or non-profits?</h3>
+                    <p class="faq-answer">Yes! Contact us at livey_sh13lds1b33@keemail.me with proof of status for special pricing.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3 class="faq-question">How do I receive my license key?</h3>
+                    <p class="faq-answer">License keys are delivered instantly via email after purchase. You'll also get access to our customer portal.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="cta-card">
+                <h2 class="cta-title">Ready to Get Started?</h2>
+                <p class="cta-description">
+                    Download INT3RCEPTOR for free and upgrade when you're ready.
+                </p>
+                <div class="cta-buttons">
+                    <a href="https://github.com/S1b-Team/int3rceptor/releases/latest" target="_blank" class="btn btn-primary btn-lg">Download Free</a>
+                    <a href="mailto:livey_sh13lds1b33@keemail.me" class="btn btn-secondary btn-lg">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <span class="logo-bracket">[</span>
+                        <span class="logo-text">S1<span class="logo-accent">b</span></span>
+                        <span class="logo-bracket">]</span>
+                    </div>
+                    <p class="footer-tagline">
+                        Professional security testing toolkit built by hackers, for hackers.
+                    </p>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="../index.html#features">Features</a></li>
+                        <li><a href="index.html">Pricing</a></li>
+                        <li><a href="../docs/index.html">Documentation</a></li>
+                        <li><a href="../download/index.html">Download</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Plugins</h4>
+                    <ul>
+                        <li><a href="#edict">EDICT (PKI)</a></li>
+                        <li><a href="#myrmidon">MYRMIDON (Orchestration)</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Company</h4>
+                    <ul>
+                        <li><a href="mailto:livey_sh13lds1b33@keemail.me">Contact</a></li>
+                        <li><a href="https://github.com/S1b-Team" target="_blank">GitHub</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2025 S1b Team. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../script.js"></script>
+    <script src="pricing.js"></script>
+</body>
+</html>
