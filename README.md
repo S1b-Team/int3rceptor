@@ -485,7 +485,7 @@ npm run dev
 
 | Feature                    | Int3rceptor      | Burp Suite Pro | Winner                       |
 | -------------------------- | ---------------- | -------------- | ---------------------------- |
-| **Price**                  | **$59/year**     | $449/year      | 🏆 Int3rceptor (87% cheaper) |
+| **Price**                  | **$399/year**    | $449/year      | 🏆 Int3rceptor (11% cheaper) |
 | **Throughput**             | **15,234 req/s** | 2,145 req/s    | 🏆 Int3rceptor (7.1x faster) |
 | **Memory Usage**           | **45 MB**        | 512 MB         | 🏆 Int3rceptor (91% less)    |
 | **UI Technology**          | **Vue 3**        | Swing (legacy) | 🏆 Int3rceptor (modern)      |
@@ -508,7 +508,7 @@ npm run dev
 | **WebSocket**   | ✅ Full                     | ❌          | ✅ Basic       |
 | **License**     | Proprietary (Free personal) | MIT         | Apache 2.0     |
 
-**Summary**: Int3rceptor offers **Burp Suite-level features** at **mitmproxy-level pricing** with **superior performance**.
+**Summary**: Int3rceptor offers **Burp Suite-level features** at **competitive pricing** with **superior performance**.
 
 ---
 
@@ -534,37 +534,32 @@ npm run dev
 #### 🏢 **Enterprise License** - Custom Pricing
 
 -   Unlimited commercial use
--   Deploy on unlimited servers
--   Modify source code for internal use
+-   Unlimited users
+-   24/7 Phone Support
+-   On-premise deployment
+-   SLA guarantees
+-   Dedicated support engineer
+
+#### 🏢 **Business License** - $1,199/year
+
+-   **Small Teams** (up to 5 users)
 -   Priority support (24h response)
--   SSO / SAML Integration
--   Dedicated Account Manager
+-   Team collaboration features
+-   Audit logging
+-   Custom integrations
 
-#### 🚀 **Startup License** - $499/year
+#### 💼 **Professional License** - $399/year
 
--   Commercial use (up to 10 users)
--   Deploy on up to 5 servers
+-   **Individual security testers** (1 user)
+-   Commercial use allowed
+-   Advanced scanner included
+-   Premium plugins access
 -   Email support (48h response)
--   Security updates
-
-#### � **Lifetime License** - $249 (One-time payment)
-
--   **Commercial use forever** (single user)
--   **All future major versions** (v3, v4, etc.)
--   **Early access** to beta features
--   Special "Early Adopter" badge on profile
--   Priority support queue
-
-#### �👤 **Individual License** - $59/year
-
--   Commercial use (single user)
--   Deploy on up to 2 servers
--   Community support
 
 ### How to Purchase
 
 📧 **Email**: s1bgr0up.root@gmail.com
-📄 **Details**: See [LICENSE_COMMERCIAL.md](LICENSE_COMMERCIAL.md)
+📄 **Details**: See [PRICING.md](../PRICING.md)
 
 ---
 
