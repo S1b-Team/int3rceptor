@@ -1,0 +1,6 @@
+[submodule "plugins/edict"]
+	path = plugins/edict
+	url = git@github.com:S1b-Team/edict.git
+[submodule "plugins/myrmidon"]
+	path = plugins/myrmidon
+	url = git@github.com:S1b-Team/myrmidon.git
