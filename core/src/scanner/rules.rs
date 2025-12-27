@@ -4,6 +4,7 @@ use super::types::{Finding, ResponseInfo, Severity, VulnerabilityCategory};
 use crate::capture::CaptureEntry;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use tracing::warn;
 #[cfg(feature = "pro")]
 const PREMIUM_RULES_JSON: &str = include_str!("../../../core-pro/src/rules/premium_rules.json");
 
@@ -211,13 +212,29 @@ impl DetectionRule {
 
         #[cfg(feature = "pro")]
         {
-            let mut pro_rules = load_premium_rules();
-            rules.append(&mut pro_rules);
+            if let Some(valid_rules) = load_premium_rules_with_license() {
+                rules.extend(valid_rules);
+            } else {
+                warn!("Premium rules not loaded: missing or invalid license (INT3RCEPTOR_LICENSE)");
+            }
+        }
+
+        if rules.is_empty() {
+            warn!("Free ruleset is empty in OSS build; premium tier required for scanning.");
         }
 
         rules
     }
 
+}
+
+#[cfg(feature = "pro")]
+fn load_premium_rules_with_license() -> Option<Vec<DetectionRule>> {
+    let key = std::env::var("INT3RCEPTOR_LICENSE").ok()?;
+    if !core_pro::licensing::validate_license(&key) {
+        return None;
+    }
+    Some(load_premium_rules())
 }
 
 #[cfg(test)]
