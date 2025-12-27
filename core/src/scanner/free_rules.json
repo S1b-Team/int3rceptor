@@ -1,0 +1,44 @@
+[
+  {
+    "id": "sqli-error-based",
+    "name": "SQL Injection (Error-Based)",
+    "category": "Injection",
+    "severity": "High",
+    "description": "SQL injection detected via error patterns",
+    "request_patterns": [],
+    "response_patterns": ["sql syntax", "mysql_fetch", "ORA-", "syntax error"],
+    "header_patterns": [],
+    "active_payloads": ["' OR '1'='1", "\" OR \"1\"=\"1", "1' UNION SELECT NULL--"],
+    "remediation": "Use prepared statements and sanitize inputs.",
+    "references": ["https://owasp.org/www-community/attacks/SQL_Injection"],
+    "enabled": true
+  },
+  {
+    "id": "xss-reflected",
+    "name": "Cross-Site Scripting (Reflected)",
+    "category": "XSS",
+    "severity": "Medium",
+    "description": "Reflected XSS detected",
+    "request_patterns": [],
+    "response_patterns": [],
+    "header_patterns": [],
+    "active_payloads": ["<script>alert(1)</script>", "<img src=x onerror=alert(1)>", "javascript:alert(1)"],
+    "remediation": "Encode output and set CSP.",
+    "references": ["https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"],
+    "enabled": true
+  },
+  {
+    "id": "open-redirect",
+    "name": "Open Redirect",
+    "category": "OpenRedirect",
+    "severity": "Medium",
+    "description": "Application may redirect to untrusted URLs",
+    "request_patterns": ["redirect=", "url=", "next=", "return="],
+    "response_patterns": [],
+    "header_patterns": [],
+    "active_payloads": ["https://evil.com", "//evil.com"],
+    "remediation": "Validate redirect targets against an allowlist.",
+    "references": ["https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html"],
+    "enabled": true
+  }
+]

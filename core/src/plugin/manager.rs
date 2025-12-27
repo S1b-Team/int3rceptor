@@ -84,6 +84,11 @@ impl PluginManager {
 
         // Check if file exists
         if !plugin_path.exists() {
+            if self.config.ignore_missing {
+                warn!(plugin = %config.name, path = %plugin_path.display(), "Plugin file missing; skipping (optional)");
+                return Ok(());
+            }
+
             return Err(ProxyError::internal(format!(
                 "Plugin file not found: {}",
                 plugin_path.display()

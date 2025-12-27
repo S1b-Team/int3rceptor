@@ -222,7 +222,7 @@ cd benchmarks
 ```bash
 # Clone the repository
 git clone https://github.com/S1b-Team/int3rceptor.git
-cd interceptor
+cd int3rceptor
 
 # Build the backend
 cargo build --release
@@ -235,6 +235,36 @@ cd ..
 
 # Run Interceptor
 ./target/release/interceptor
+```
+
+### Optional premium plugins (private submodules)
+
+The premium plugins **edict** (PKI/CA) and **myrmidon** (advanced intruder) live as private Git submodules. They are not required for public builds.
+
+- Public users: skip them; the app builds and runs with the bundled `plugins/example_logger.wasm`.
+- Licensed users: fetch them explicitly (SSH/HTTPS auth required):
+
+```bash
+git submodule update --init plugins/edict plugins/myrmidon
+```
+
+The submodules are marked `update = none` so default `git submodule update --init --recursive` will not fail when you do not have access.
+
+### Optional private core
+
+Enterprise-only core components reside in a private submodule at `core-pro`. Public builds do not depend on it.
+
+- Public users: no action needed; the open-core continues to work.
+- Enterprise users: fetch the private core (SSH/HTTPS auth required):
+
+```bash
+git submodule update --init core-pro
+```
+
+The entry uses `update = none`, so public clones remain unaffected. Enable the premium core at build time with:
+
+```bash
+cargo build --features pro
 ```
 
 ### Default Configuration

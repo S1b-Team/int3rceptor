@@ -94,6 +94,7 @@ impl Default for PluginConfig {
 
 /// Global plugin system configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PluginSystemConfig {
     /// Directory containing plugins
     pub plugin_dir: PathBuf,
@@ -103,6 +104,9 @@ pub struct PluginSystemConfig {
 
     /// List of configured plugins
     pub plugins: Vec<PluginConfig>,
+
+    /// Treat missing plugin files as non-fatal (for optional private plugins)
+    pub ignore_missing: bool,
 }
 
 impl Default for PluginSystemConfig {
@@ -111,6 +115,7 @@ impl Default for PluginSystemConfig {
             plugin_dir: PathBuf::from("plugins"),
             enabled: true,
             plugins: Vec::new(),
+            ignore_missing: true,
         }
     }
 }

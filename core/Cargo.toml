@@ -27,6 +27,8 @@ rusqlite.workspace = true
 regex = "1.10"
 obfstr = "0.4"
 once_cell = "1.19"
+sentry = { version = "0.46.0", default-features = false, features = ["backtrace", "panic", "transport", "anyhow"] }
+sentry-tracing = "0.46.0"
 # Scanner dependencies
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4"] }
@@ -37,6 +39,13 @@ wasmtime-wasi = "17.0"
 hex = "0.4.3"
 html-escape = "0.2.13"
 similar = "2.7.0"
+
+[features]
+default = []
+pro = []
+
+[target.'cfg(feature = "pro")'.dependencies]
+core-pro = { path = "../core-pro", package = "int3rceptor-pro" }
 
 [dev-dependencies]
 tempfile = "3.10"
