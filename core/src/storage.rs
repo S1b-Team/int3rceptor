@@ -1,4 +1,5 @@
 use crate::capture::{CaptureEntry, CaptureQuery, CapturedRequest, CapturedResponse};
+use crate::database::EncryptionKeyProvider;
 use crate::error::Result;
 use rusqlite::{params, Connection, OpenFlags, ToSql};
 use serde_json;
@@ -9,6 +10,7 @@ use std::time::Duration;
 #[derive(Debug)]
 pub struct CaptureStorage {
     path: PathBuf,
+    encryption: EncryptionKeyProvider,
 }
 
 impl CaptureStorage {
@@ -17,7 +19,20 @@ impl CaptureStorage {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let storage = Self { path };
+        let encryption = EncryptionKeyProvider::new()?;
+        let storage = Self { path, encryption };
+        storage.init()?;
+        Ok(storage)
+    }
+
+    /// Create storage with optional encryption disabled (testing only)
+    pub fn new_unencrypted(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let encryption = EncryptionKeyProvider::default();
+        let storage = Self { path, encryption };
         storage.init()?;
         Ok(storage)
     }
@@ -57,12 +72,30 @@ impl CaptureStorage {
     }
 
     pub fn insert(&self, entry: &CaptureEntry) -> Result<()> {
+        use crate::database;
+
         let conn = self.connect()?;
-        let body = if entry.request.body.is_empty() {
+
+        // Encrypt sensitive request data
+        let headers_json = serde_json::to_string(&entry.request.headers)?;
+        let encrypted_headers = database::encrypt_if_enabled(&self.encryption, headers_json.as_bytes())?;
+
+        let encrypted_body = if entry.request.body.is_empty() {
             None
         } else {
-            Some(entry.request.body.as_slice())
+            Some(database::encrypt_if_enabled(&self.encryption, &entry.request.body)?)
         };
+
+        // Encrypt sensitive response data
+        let resp_headers = entry
+            .response
+            .as_ref()
+            .map(|r| {
+                let json = serde_json::to_string(&r.headers)?;
+                database::encrypt_if_enabled(&self.encryption, json.as_bytes())
+            })
+            .transpose()?;
+
         let resp_body = entry.response.as_ref().and_then(|r| {
             if r.body.is_empty() {
                 None
@@ -70,11 +103,11 @@ impl CaptureStorage {
                 Some(r.body.as_slice())
             }
         });
-        let resp_headers = entry
-            .response
-            .as_ref()
-            .map(|r| serde_json::to_string(&r.headers))
+
+        let encrypted_resp_body = resp_body
+            .map(|b| database::encrypt_if_enabled(&self.encryption, b))
             .transpose()?;
+
         conn.execute(
             r#"
             INSERT OR REPLACE INTO captures (
@@ -96,12 +129,12 @@ impl CaptureStorage {
                 clamp_i128(entry.request.timestamp_ms),
                 entry.request.method,
                 entry.request.url,
-                serde_json::to_string(&entry.request.headers)?,
-                body,
+                encrypted_headers,
+                encrypted_body,
                 if entry.request.tls { 1 } else { 0 },
                 entry.response.as_ref().map(|r| r.status_code as i64),
                 resp_headers,
-                resp_body,
+                encrypted_resp_body,
                 entry.response.as_ref().map(|r| clamp_u128(r.duration_ms)),
             ],
         )?;
@@ -115,6 +148,8 @@ impl CaptureStorage {
     }
 
     pub fn query(&self, filter: &CaptureQuery) -> Result<Vec<CaptureEntry>> {
+        use crate::database;
+
         let mut sql = String::from(
             "SELECT id, timestamp_ms, method, url, headers, body, tls, resp_status, resp_headers, resp_body, duration_ms FROM captures WHERE 1=1",
         );
@@ -137,9 +172,8 @@ impl CaptureStorage {
             values.push(if tls { "1" } else { "0" }.into());
         }
         if let Some(search) = &filter.search {
-            sql.push_str(" AND (url LIKE ? OR headers LIKE ?)");
+            sql.push_str(" AND (url LIKE ?)");  // Note: can't search encrypted headers
             let pattern = format!("%{}%", search);
-            values.push(pattern.clone());
             values.push(pattern);
         }
         sql.push_str(" ORDER BY id DESC");
@@ -152,24 +186,43 @@ impl CaptureStorage {
         let mut rows = stmt.query(&param_refs[..])?;
         let mut entries = Vec::new();
         while let Some(row) = rows.next()? {
+            // Decrypt sensitive request data
+            let encrypted_headers: Vec<u8> = row.get(4)?;
+            let decrypted_headers = database::decrypt_if_enabled(&self.encryption, &encrypted_headers)?;
+            let headers = serde_json::from_slice::<Vec<(String, String)>>(&decrypted_headers)
+                .unwrap_or_default();
+
+            let encrypted_body: Option<Vec<u8>> = row.get(5)?;
+            let body = encrypted_body
+                .as_ref()
+                .and_then(|b| database::decrypt_if_enabled(&self.encryption, b).ok())
+                .unwrap_or_default();
+
             let request = CapturedRequest {
                 id: row.get::<_, i64>(0)? as u64,
                 timestamp_ms: row.get::<_, i64>(1)? as i128,
                 method: row.get(2)?,
                 url: row.get(3)?,
-                headers: serde_json::from_str::<Vec<(String, String)>>(&row.get::<_, String>(4)?)?,
-                body: row.get::<_, Option<Vec<u8>>>(5)?.unwrap_or_default(),
+                headers,
+                body,
                 tls: row.get::<_, i64>(6)? == 1,
             };
+
             let response = match row.get::<_, Option<i64>>(7)? {
                 Some(status) => {
-                    let header_json: Option<String> = row.get(8)?;
-                    let headers = header_json
-                        .map(|h| {
-                            serde_json::from_str::<Vec<(String, String)>>(&h).unwrap_or_default()
-                        })
+                    let encrypted_resp_headers: Option<Vec<u8>> = row.get(8)?;
+                    let headers = encrypted_resp_headers
+                        .as_ref()
+                        .and_then(|h| database::decrypt_if_enabled(&self.encryption, h).ok())
+                        .and_then(|h| serde_json::from_slice::<Vec<(String, String)>>(&h).ok())
                         .unwrap_or_default();
-                    let body = row.get::<_, Option<Vec<u8>>>(9)?.unwrap_or_default();
+
+                    let encrypted_resp_body: Option<Vec<u8>> = row.get(9)?;
+                    let body = encrypted_resp_body
+                        .as_ref()
+                        .and_then(|b| database::decrypt_if_enabled(&self.encryption, b).ok())
+                        .unwrap_or_default();
+
                     let duration_ms = row.get::<_, Option<i64>>(10)?.unwrap_or(0) as u128;
                     Some(CapturedResponse {
                         request_id: request.id,
@@ -227,7 +280,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
 
-        let storage = CaptureStorage::new(&db_path);
+        let storage = CaptureStorage::new_unencrypted(&db_path);
         assert!(storage.is_ok());
         assert!(db_path.exists());
     }
@@ -236,7 +289,7 @@ mod tests {
     fn test_storage_insert_and_query() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         let entry = create_test_entry(1, "GET", "https://api.test.com/users", Some(200));
         storage.insert(&entry).unwrap();
@@ -252,7 +305,7 @@ mod tests {
     fn test_storage_query_by_method() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         storage
             .insert(&create_test_entry(1, "GET", "/api/users", Some(200)))
@@ -278,7 +331,7 @@ mod tests {
     fn test_storage_query_by_host() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         storage
             .insert(&create_test_entry(
@@ -311,7 +364,7 @@ mod tests {
     fn test_storage_query_by_status() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         storage
             .insert(&create_test_entry(1, "GET", "/success", Some(200)))
@@ -337,7 +390,7 @@ mod tests {
     fn test_storage_query_by_tls() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         storage
             .insert(&create_test_entry(
@@ -370,7 +423,7 @@ mod tests {
     fn test_storage_query_with_search() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         storage
             .insert(&create_test_entry(1, "GET", "/api/v1/users", Some(200)))
@@ -393,7 +446,7 @@ mod tests {
     fn test_storage_query_with_limit() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         for i in 0..10 {
             storage
@@ -419,7 +472,7 @@ mod tests {
     fn test_storage_clear() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         storage
             .insert(&create_test_entry(1, "GET", "/test1", Some(200)))
@@ -441,7 +494,7 @@ mod tests {
     fn test_storage_entry_without_response() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         let entry = create_test_entry(1, "GET", "/pending", None);
         storage.insert(&entry).unwrap();
@@ -455,7 +508,7 @@ mod tests {
     fn test_storage_preserves_body_data() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         let entry = create_test_entry(1, "POST", "/data", Some(200));
         storage.insert(&entry).unwrap();
@@ -469,7 +522,7 @@ mod tests {
     fn test_storage_upsert_same_id() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let storage = CaptureStorage::new(&db_path).unwrap();
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
 
         // Insert with same ID twice (should replace)
         storage

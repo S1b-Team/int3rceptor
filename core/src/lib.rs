@@ -3,6 +3,7 @@ pub mod cert_manager;
 pub mod comparer;
 pub mod connection_pool;
 pub mod crypto;
+pub mod database;
 pub mod encoding;
 pub mod error;
 pub mod integration;
