@@ -31,4 +31,5 @@ pub struct AppState {
     pub ip_filter: Arc<IpFilter>,
     pub settings: Arc<RwLock<AppSettings>>,
     pub plugin_manager: Arc<PluginManager>,
+    pub license_manager: Arc<interceptor_core::license::LicenseManager>,
 }

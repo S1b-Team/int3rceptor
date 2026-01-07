@@ -135,6 +135,11 @@ impl ProxyServer {
                                     Err(err) => {
                                         metrics().record_request_error();
                                         warn!(%err, "Proxy error");
+                                        crate::telemetry::sentry::capture_anyhow(
+                                            &anyhow::anyhow!("{}", err),
+                                            "proxy",
+                                            &[("action", "handle_request")],
+                                        );
                                         Ok(error_response(err))
                                     }
                                 }
@@ -408,7 +413,13 @@ async fn handle_tls_connect(
         Err(e) => {
             metrics().record_tls_error();
             warn!(%e, "TLS handshake failed");
-            return Err(ProxyError::tls_handshake("unknown", e.to_string()));
+            let err = ProxyError::tls_handshake("unknown", e.to_string());
+            crate::telemetry::sentry::capture_anyhow(
+                &anyhow::anyhow!("{}", err),
+                "proxy",
+                &[("action", "tls_handshake")],
+            );
+            return Err(err);
         }
     };
     let stream = TokioIo::new(stream);

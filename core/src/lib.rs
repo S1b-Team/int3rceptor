@@ -2,6 +2,7 @@ pub mod capture;
 pub mod cert_manager;
 pub mod comparer;
 pub mod connection_pool;
+pub mod crypto;
 pub mod encoding;
 pub mod error;
 pub mod integration;
@@ -16,6 +17,7 @@ pub mod scanner;
 pub mod scope;
 pub mod security;
 pub mod storage;
+pub mod telemetry;
 pub mod tls;
 pub mod websocket;
 

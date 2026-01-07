@@ -28,6 +28,12 @@
 
         <nav class="main-nav">
             <button
+                :class="{ active: currentTab === 'dashboard' }"
+                @click="currentTab = 'dashboard'"
+            >
+                Dashboard
+            </button>
+            <button
                 :class="{ active: currentTab === 'traffic' }"
                 @click="currentTab = 'traffic'"
             >
@@ -137,8 +143,12 @@
             <ScopeTab />
         </template>
 
-        <template v-else>
+        <template v-else-if="currentTab === 'intruder'">
             <IntruderTab />
+        </template>
+
+        <template v-else>
+            <DashboardTab />
         </template>
     </div>
 </template>
@@ -151,6 +161,7 @@ import RepeaterTab from "./components/RepeaterTab.vue";
 import RulesTab from "./components/RulesTab.vue";
 import ScopeTab from "./components/ScopeTab.vue";
 import IntruderTab from "./components/IntruderTab.vue";
+import DashboardTab from "./components/DashboardTab.vue";
 import { useApi, api } from "./composables/useApi";
 import { useWebSocket } from "./composables/useWebSocket";
 import type { CaptureEntry } from "./types";
@@ -162,7 +173,9 @@ const items = ref<CaptureEntry[]>([]);
 const selectedId = ref<number | null>(null);
 const loading = ref(false);
 const exporting = ref(false);
-const currentTab = ref<"traffic" | "rules" | "scope" | "intruder">("traffic");
+const currentTab = ref<
+    "traffic" | "rules" | "scope" | "intruder" | "dashboard"
+>("traffic");
 
 const filterMethod = ref("");
 const filterHost = ref("");
@@ -260,27 +273,27 @@ const exportData = async (format: "json" | "csv" | "har") => {
 }
 
 .main-nav {
-  display: flex;
-  gap: 1rem;
-  padding: 0.5rem 2rem;
-  background: rgba(15, 23, 42, 0.95);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    display: flex;
+    gap: 1rem;
+    padding: 0.5rem 2rem;
+    background: rgba(15, 23, 42, 0.95);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .main-nav button {
-  background: transparent;
-  color: #94a3b8;
-  border: 1px solid transparent;
-  padding: 0.4rem 1rem;
-  cursor: pointer;
-  font-weight: 600;
-  border-radius: 4px;
+    background: transparent;
+    color: #94a3b8;
+    border: 1px solid transparent;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    border-radius: 4px;
 }
 
 .main-nav button.active {
-  background: rgba(56, 189, 248, 0.1);
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.3);
+    background: rgba(56, 189, 248, 0.1);
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.3);
 }
 
 header {

@@ -18,6 +18,16 @@ use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let _sentry_guard = interceptor_core::telemetry::sentry::init_sentry();
+    sentry::configure_scope(|scope| {
+        scope.set_tag("component", "api");
+        scope.set_tag(
+            "tier",
+            std::env::var("SENTRY_TELEMETRY_TIER").unwrap_or_else(|_| "0".to_string()),
+        );
+        scope.set_tag("os", std::env::consts::OS);
+        scope.set_tag("arch", std::env::consts::ARCH);
+    });
     tracing_subscriber::fmt().with_env_filter("info").init();
 
     let db_path =
@@ -135,6 +145,12 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!("Failed to load plugins: {}", e);
     }
 
+    let mut license_manager = interceptor_core::license::LicenseManager::new();
+    if let Err(e) = license_manager.load_license() {
+        tracing::warn!("Failed to load license: {}", e);
+    }
+    let license_manager = Arc::new(license_manager);
+
     let project_manager = Arc::new(ProjectManager::new(Some(storage.clone())));
 
     let state = AppState {
@@ -155,6 +171,7 @@ async fn main() -> anyhow::Result<()> {
         ip_filter,
         settings,
         plugin_manager,
+        license_manager,
     };
 
     let addr: SocketAddr = std::env::var("API_ADDR")

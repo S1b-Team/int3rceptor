@@ -1,0 +1,88 @@
+name: Sentry UI Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  ui-release:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SENTRY_ENVIRONMENT: production
+      VITE_TELEMETRY_TIER: 1
+      SENTRY_PROJECT: int3rceptor-ui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Compute release
+        id: release_meta
+        run: |
+          VERSION=$(node -p "require('./ui/package.json').version")
+          SHA=$(git rev-parse --short HEAD)
+          echo "release=int3rceptor-ui@${VERSION}+${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Install deps
+        working-directory: ui
+        run: npm ci --no-progress
+
+      - name: Create Sentry release
+        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' && secrets.SENTRY_ORG != '' }}
+        working-directory: ui
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ steps.release_meta.outputs.release }}
+        run: npx @sentry/cli releases new "$SENTRY_RELEASE"
+
+      - name: Build UI
+        working-directory: ui
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ steps.release_meta.outputs.release }}
+          VITE_SENTRY_RELEASE: ${{ steps.release_meta.outputs.release }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_APP_VERSION: ${{ steps.release_meta.outputs.release }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_TELEMETRY_TIER: 1
+          SENTRY_LOG_LEVEL: error
+        run: npm run build
+
+      - name: Upload sourcemaps (dist/)
+        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' && secrets.SENTRY_ORG != '' }}
+        working-directory: ui
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ steps.release_meta.outputs.release }}
+        run: |
+          npx @sentry/cli releases files "$SENTRY_RELEASE" upload-sourcemaps ./dist \
+            --rewrite \
+            --validate \
+            --url-prefix "~/" \
+            --ext js --ext map
+
+      - name: Finalize release
+        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' && secrets.SENTRY_ORG != '' }}
+        working-directory: ui
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ steps.release_meta.outputs.release }}
+        run: npx @sentry/cli releases finalize "$SENTRY_RELEASE"

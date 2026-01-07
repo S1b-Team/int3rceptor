@@ -10,11 +10,14 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@sentry/browser": "^7.119.0",
+    "@sentry/tracing": "^7.119.0",
     "axios": "^1.6.7",
     "highlight.js": "^11.11.1",
     "vue": "^3.4.0"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^2.22.2",
     "@types/highlight.js": "^9.12.4",
     "@vitejs/plugin-vue": "^5.0.0",
     "typescript": "^5.4.0",

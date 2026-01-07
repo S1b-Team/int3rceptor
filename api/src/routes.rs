@@ -173,6 +173,24 @@ pub fn router() -> Router {
             "/api/security/audit-log/rotate",
             post(crate::security_routes::rotate_audit_log),
         )
+        // License routes
+        .route("/api/license", get(get_license))
+}
+
+async fn get_license(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    let license = state.license_manager.license();
+    let tier = state.license_manager.tier();
+
+    Json(json!({
+        "tier": tier,
+        "license": license,
+        "features": {
+            "intruder": state.license_manager.check_feature("intruder"),
+            "websocket": state.license_manager.check_feature("websocket"),
+            "rules": state.license_manager.check_feature("rules"),
+            "export": state.license_manager.check_feature("export"),
+        }
+    }))
 }
 
 async fn list_requests(

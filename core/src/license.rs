@@ -4,8 +4,10 @@
 // ║                        All Rights Reserved                                ║
 // ║  CRITICAL: This module contains proprietary license validation logic.     ║
 // ║  Tampering with this code violates the license agreement.                 ║
+// ║  Q1 2026: Ed25519 signature verification implemented for security        ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
+use crate::crypto;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -128,9 +130,10 @@ impl LicenseValidator {
 
     /// Validate a license key
     pub fn validate(&self, license_key: &str) -> Result<License> {
+        use base64::{engine::general_purpose, Engine};
+        
         // Decode base64 license key
-        #[allow(deprecated)]
-        let decoded = base64::decode(license_key)
+        let decoded = general_purpose::STANDARD.decode(license_key)
             .map_err(|_| anyhow!(obfstr::obfstr!("Invalid license key format").to_string()))?;
 
         // Parse license data
@@ -156,11 +159,35 @@ impl LicenseValidator {
         Ok(license)
     }
 
-    /// Verify license signature (placeholder - implement with real crypto)
-    fn verify_signature(&self, _license: &License) -> bool {
-        // In production, use ed25519 or RSA signature verification
-        // For now, we'll use a simple checksum
-        true // FIXME: Implement real signature verification
+    /// Verify license signature using Ed25519
+    fn verify_signature(&self, license: &License) -> bool {
+        if license.key.is_empty() {
+            // Empty key means free tier (no signature needed)
+            return license.tier == LicenseTier::Free;
+        }
+
+        // Decode license key from base64 (format: signature|license_json)
+        use base64::{engine::general_purpose, Engine};
+        let decoded = match general_purpose::STANDARD.decode(&license.key) {
+            Ok(d) => d,
+            Err(_) => return false,
+        };
+
+        // Extract signature (first 64 bytes) and license data (remaining bytes)
+        if decoded.len() < 64 {
+            return false;
+        }
+
+        let (sig_bytes, license_data) = decoded.split_at(64);
+        let public_key_bytes = match self.public_key.as_bytes().try_into() {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+
+        match crypto::verify_ed25519_signature(public_key_bytes, license_data, sig_bytes) {
+            Ok(valid) => valid,
+            Err(_) => false,
+        }
     }
 }
 
@@ -171,25 +198,34 @@ impl Default for LicenseValidator {
 }
 
 /// Get hardware fingerprint for license binding
+/// Uses SHA-256 for cryptographic strength (prevents trivial spoofing)
 fn get_hardware_id() -> Result<String> {
-    // Combine multiple hardware identifiers for robust fingerprinting
     use std::process::Command;
 
     let mut components = Vec::new();
 
-    // CPU ID (Linux)
+    // Machine ID (most reliable - system-wide unique identifier)
+    if let Ok(output) = Command::new("cat").arg("/etc/machine-id").output() {
+        if let Ok(content) = String::from_utf8(output.stdout) {
+            components.push(format!("machine_id:{}", content.trim()));
+        }
+    }
+
+    // CPU info (Linux)
     if let Ok(output) = Command::new("cat").arg("/proc/cpuinfo").output() {
         if let Ok(content) = String::from_utf8(output.stdout) {
-            if let Some(line) = content.lines().find(|l| l.starts_with("processor")) {
-                components.push(line.to_string());
+            if let Some(line) = content.lines().find(|l| l.starts_with("model name")) {
+                components.push(format!("cpu:{}", line));
             }
         }
     }
 
-    // Machine ID (Linux)
-    if let Ok(output) = Command::new("cat").arg("/etc/machine-id").output() {
+    // OS version
+    if let Ok(output) = Command::new("cat").arg("/etc/os-release").output() {
         if let Ok(content) = String::from_utf8(output.stdout) {
-            components.push(content.trim().to_string());
+            if let Some(line) = content.lines().find(|l| l.starts_with("ID=")) {
+                components.push(format!("os:{}", line));
+            }
         }
     }
 
@@ -200,13 +236,12 @@ fn get_hardware_id() -> Result<String> {
         .to_string()));
     }
 
-    // Hash the components
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    // Use SHA-256 for cryptographic hashing (prevents trivial spoofing via DefaultHasher)
+    let combined = components.join("|");
+    let hash = crypto::sha256_hash(combined.as_bytes());
+    let hex_hash = hex::encode(hash);
 
-    let mut hasher = DefaultHasher::new();
-    components.join("|").hash(&mut hasher);
-    Ok(format!("{:x}", hasher.finish()))
+    Ok(hex_hash)
 }
 
 /// License manager - handles loading and caching of licenses
