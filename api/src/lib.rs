@@ -6,6 +6,7 @@ pub mod ip_filter;
 pub mod models;
 pub mod routes;
 pub mod security_routes;
+pub mod session;
 pub mod state;
 pub mod tls;
 pub mod websocket;

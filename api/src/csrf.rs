@@ -107,6 +107,7 @@ impl CsrfProtection {
 }
 
 /// Axum middleware for CSRF protection
+/// P3 Security Hardening: Session-based CSRF protection (not IP-based)
 pub async fn csrf_protection_middleware(
     State(csrf): State<Arc<CsrfProtection>>,
     req: Request,
@@ -120,12 +121,36 @@ pub async fn csrf_protection_middleware(
         return next.run(req).await;
     }
 
-    // Extract client identifier (using IP address as fallback)
+    // Extract session ID from cookie (much more secure than IP-based)
+    // NOTE: Session cookie should be HttpOnly, Secure, SameSite=Strict
+    // This prevents JavaScript from accessing it and XSS attacks from stealing it
     let client_id = req
         .headers()
-        .get("X-Forwarded-For")
+        .get(header::COOKIE)
         .and_then(|v| v.to_str().ok())
+        .and_then(|cookie_header| {
+            // Parse cookie header for session cookie
+            cookie_header
+                .split(';')
+                .map(|s| s.trim())
+                .find(|s| s.starts_with("int3rceptor_session="))
+                .map(|s| s.strip_prefix("int3rceptor_session=").unwrap_or(""))
+        })
         .unwrap_or("unknown");
+
+    if client_id == "unknown" {
+        tracing::warn!(
+            method = %req.method(),
+            path = %req.uri(),
+            "CSRF validation failed: no session cookie found"
+        );
+        return (
+            StatusCode::FORBIDDEN,
+            [(header::CONTENT_TYPE, "application/json")],
+            r#"{"error":"Session required for state-changing operations"}"#,
+        )
+            .into_response();
+    }
 
     // Get CSRF token from header
     let provided_token = req.headers().get(CSRF_HEADER).and_then(|v| v.to_str().ok());
@@ -137,16 +162,16 @@ pub async fn csrf_protection_middleware(
     }
 
     tracing::warn!(
-        client_id = %client_id,
+        session_id = client_id,
         method = %req.method(),
         path = %req.uri(),
-        "CSRF token validation failed"
+        "CSRF token validation failed - token invalid or expired"
     );
 
     (
         StatusCode::FORBIDDEN,
         [(header::CONTENT_TYPE, "application/json")],
-        r#"{"error":"CSRF token missing or invalid"}"#,
+        r#"{"error":"CSRF token missing, invalid, or expired"}"#,
     )
         .into_response()
 }
