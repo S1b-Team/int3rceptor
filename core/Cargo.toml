@@ -40,8 +40,12 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4"] }
 urlencoding = "2.1"
 # Plugin system (WASM)
-wasmtime = "17.0"
-wasmtime-wasi = "17.0"
+# Updated to 34.0+ to fix multiple security vulnerabilities
+# - RUSTSEC-2024-0438: Windows device filename sandboxing
+# - RUSTSEC-2025-0046: fd_renumber panic
+# - RUSTSEC-2025-0118: Unsound shared memory access
+wasmtime = "34.0"
+wasmtime-wasi = "34.0"
 hex = "0.4.3"
 html-escape = "0.2.13"
 similar = "2.7.0"
