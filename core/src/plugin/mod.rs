@@ -6,11 +6,13 @@ pub mod hooks;
 pub mod host_functions;
 pub mod manager;
 pub mod runtime;
+pub mod security;
 
 pub use config::{PluginConfig, PluginPermissions};
 pub use hooks::{HookContext, HookResult, PluginHook};
 pub use manager::PluginManager;
 pub use runtime::PluginRuntime;
+pub use security::{PluginSecurityValidator, PluginResourceLimits};
 
 /// Plugin API version - plugins must match this version
 pub const PLUGIN_API_VERSION: u32 = 1;
