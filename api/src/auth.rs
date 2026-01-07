@@ -15,43 +15,74 @@ static RATE_LIMITER: Lazy<RateLimiter> =
     Lazy::new(|| RateLimiter::new(100, Duration::from_secs(60)));
 
 /// Authentication middleware with timing-safe comparison
+/// P2 Security Hardening: Improved logging and validation
 pub async fn require_auth(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     req: Request,
     next: Next,
 ) -> Response {
     if let Some(expected_token) = &state.api_token {
         let bearer_prefix = "Bearer ";
+        let ip = addr.ip();
+        let method = req.method().clone();
+        let path = req.uri().to_string();
 
         // Check Authorization header (Bearer token)
-        let bearer_auth = req
+        let auth_header = req
             .headers()
             .get("Authorization")
-            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.to_str().ok());
+
+        let bearer_auth = auth_header
             .filter(|value| value.starts_with(bearer_prefix))
             .map(|value| &value[bearer_prefix.len()..])
             .map(|token| constant_time_compare(token, expected_token))
             .unwrap_or(false);
 
         // Check x-api-key header
-        let api_key_auth = req
+        let api_key = req
             .headers()
             .get("x-api-key")
-            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.to_str().ok());
+
+        let api_key_auth = api_key
             .map(|token| constant_time_compare(token, expected_token))
             .unwrap_or(false);
 
         if !bearer_auth && !api_key_auth {
+            // Log authentication failure with details
+            let auth_method = if auth_header.is_some() {
+                "Authorization header (invalid)"
+            } else if api_key.is_some() {
+                "x-api-key header (invalid)"
+            } else {
+                "none"
+            };
+
             tracing::warn!(
-                path = %req.uri(),
-                "Authentication failed"
+                ip = %ip,
+                method = %method,
+                path = %path,
+                auth_method = auth_method,
+                "API authentication failed - access denied"
             );
+
             return (
                 StatusCode::UNAUTHORIZED,
                 [(header::WWW_AUTHENTICATE, "Bearer realm=\"api\"")],
+                "Unauthorized: Invalid or missing API token",
             )
                 .into_response();
         }
+
+        // Log successful authentication
+        tracing::debug!(
+            ip = %ip,
+            method = %method,
+            path = %path,
+            "API authentication successful"
+        );
     }
     next.run(req).await
 }

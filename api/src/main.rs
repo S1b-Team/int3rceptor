@@ -48,7 +48,38 @@ async fn main() -> anyhow::Result<()> {
     let ws_capture = Arc::new(WsCapture::new(10_000));
     info!("Initialized WebSocket Capture");
 
-    let api_token = std::env::var("INTERCEPTOR_API_TOKEN").ok().map(Arc::new);
+    // P2 Security Hardening: Mandatory API Authentication in Production
+    // Allow dev mode with INTERCEPTOR_DEV_MODE=1 for testing
+    let dev_mode = std::env::var("INTERCEPTOR_DEV_MODE")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false);
+
+    let api_token = if dev_mode {
+        tracing::warn!("⚠️  DEV MODE ENABLED - API authentication is optional");
+        tracing::warn!("⚠️  For production: unset INTERCEPTOR_DEV_MODE or set it to 0");
+        std::env::var("INTERCEPTOR_API_TOKEN").ok().map(Arc::new)
+    } else {
+        // Production mode: API token is REQUIRED
+        match std::env::var("INTERCEPTOR_API_TOKEN") {
+            Ok(token) => {
+                info!("✓ API authentication enabled (production mode)");
+                Some(Arc::new(token))
+            }
+            Err(_) => {
+                eprintln!();
+                eprintln!("╔════════════════════════════════════════════════════════════════╗");
+                eprintln!("║ SECURITY ERROR: API token required in production mode          ║");
+                eprintln!("║ Set INTERCEPTOR_API_TOKEN environment variable or enable       ║");
+                eprintln!("║ development mode with: INTERCEPTOR_DEV_MODE=1                 ║");
+                eprintln!("╚════════════════════════════════════════════════════════════════╝");
+                eprintln!();
+                panic!(
+                    "INTERCEPTOR_API_TOKEN is required in production mode. \
+                     Set INTERCEPTOR_DEV_MODE=1 to enable development mode without auth."
+                );
+            }
+        }
+    };
     let max_body_bytes = std::env::var("INTERCEPTOR_MAX_BODY_BYTES")
         .ok()
         .and_then(|v| v.parse().ok())

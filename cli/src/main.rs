@@ -188,6 +188,13 @@ async fn main() -> anyhow::Result<()> {
     let project_manager = Arc::new(ProjectManager::new(Some(storage.clone())));
     let scanner = Arc::new(Scanner::new());
 
+    // Initialize license manager
+    let mut license_manager = interceptor_core::license::LicenseManager::new();
+    if let Err(e) = license_manager.load_license() {
+        tracing::warn!("Failed to load license: {}", e);
+    }
+    let license_manager = Arc::new(license_manager);
+
     let api_state = interceptor_api::state::AppState {
         capture: capture.clone(),
         cert_manager: cert_manager.clone(),
@@ -206,6 +213,7 @@ async fn main() -> anyhow::Result<()> {
         ip_filter,
         settings,
         plugin_manager: plugin_manager.clone(),
+        license_manager,
     };
     let api_addr = cli.api;
     let api_task = tokio::spawn(async move { interceptor_api::serve(api_state, api_addr).await });
