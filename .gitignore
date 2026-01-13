@@ -1,0 +1,158 @@
+# ============================================
+# S1B ECOSYSTEM - GITIGNORE
+# ============================================
+# CRITICAL: This repository contains proprietary
+# code and internal documentation. Review this
+# file carefully before any push!
+# ============================================
+
+# ===========================================
+# BUILD ARTIFACTS
+# ===========================================
+/target/
+**/target/
+dist/
+build/
+*.wasm
+
+# ===========================================
+# IDE & EDITOR
+# ===========================================
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ===========================================
+# DEPENDENCIES
+# ===========================================
+node_modules/
+vendor/
+.pnpm-store/
+
+# ===========================================
+# ENVIRONMENT & CONFIG
+# ===========================================
+.env
+.env.*
+!.env.example
+*.local
+.claude/
+.gemini/
+
+# ===========================================
+# OS FILES
+# ===========================================
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===========================================
+# LOGS & TEMP
+# ===========================================
+*.log
+*.tmp
+*.temp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===========================================
+# 🔐 SECURITY: CRYPTOGRAPHIC KEYS
+# ===========================================
+# NEVER commit private/signing keys!
+keys/signing_key.hex
+keys/private_key.pem
+private_key.pem
+signing_key.hex
+*.pem
+!*.example.pem
+
+# ===========================================
+# 🔐 SECURITY: LICENSE SYSTEM (INTERNAL ONLY)
+# ===========================================
+# The license system is proprietary and should
+# not be in public repositories
+s1b-license/
+license-tool/
+int3rceptor/tools/license-gen/
+
+# Generated license files
+*.license
+*.lic
+
+# ===========================================
+# 💰 PREMIUM/PAID CONTENT
+# ===========================================
+# Core Pro module (paid features)
+int3rceptor/core-pro/
+
+# Premium plugins (sold separately)
+int3rceptor/plugins/edict/
+int3rceptor/plugins/myrmidon/
+
+# Standalone premium products
+EDICT/
+MYRMIDON/
+NOWARU/
+VOIDWALKER/
+
+# ===========================================
+# 📄 INTERNAL DOCUMENTATION (DO NOT LEAK)
+# ===========================================
+# Strategic & internal PDFs
+*.pdf
+docs/pdf/
+
+# Internal planning & architecture docs
+docs/PRODUCTION_PLAN.md
+docs/SECURITY_MECHANISMS.md
+docs/WATERMARKING.md
+docs/PENDING_MOCKUPS.md
+docs/IMAGE_GENERATION_PROMPTS.md
+
+# Pricing and licensing docs
+PRICING.md
+PREMIUM_PLUGINS.md
+LICENSING.md
+S1b_ECOSYSTEM.md
+ROADMAP.md
+
+# Next session internal notes
+**/NEXT_SESSION_PLAN.md
+
+# ===========================================
+# COMPILED BINARIES
+# ===========================================
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.app
+
+# ===========================================
+# PACKAGE LOCKS (optional - uncomment if needed)
+# ===========================================
+# Cargo.lock  # Keep for binaries, ignore for libraries
+# package-lock.json
+# yarn.lock
+
+# ===========================================
+# MISC
+# ===========================================
+*.bak
+*.backup
+*.old
+.cache/
+.parcel-cache/
+coverage/
+.nyc_output/

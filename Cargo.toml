@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "int3rceptor/core",
+    "int3rceptor/api",
+    "int3rceptor/cli",
+]
+resolver = "2"
