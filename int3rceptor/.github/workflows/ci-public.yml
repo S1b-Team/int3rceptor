@@ -1,0 +1,33 @@
+name: CI Public (free build)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-free:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (no private submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build (free tier)
+        run: cargo build --workspace --locked

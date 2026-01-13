@@ -1,0 +1,12 @@
+[submodule "plugins/edict"]
+	path = plugins/edict
+	url = git@github.com:S1b-Team/edict.git
+	update = none
+[submodule "plugins/myrmidon"]
+	path = plugins/myrmidon
+	url = git@github.com:S1b-Team/myrmidon.git
+	update = none
+[submodule "core-pro"]
+	path = core-pro
+	url = git@github.com:S1b-Team/int3rceptor-pro.git
+	update = none

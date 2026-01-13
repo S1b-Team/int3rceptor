@@ -1,0 +1,17 @@
+[
+  {
+    "id": "sqli-error-based",
+    "name": "SQL Injection (Error-Based)",
+    "category": "Injection",
+    "severity": "High",
+    "description": "SQL injection detected via error patterns",
+    "request_patterns": [],
+    "response_patterns": ["sql syntax", "mysql_fetch", "ORA-", "syntax error"],
+    "header_patterns": [],
+    "active_payloads": ["' OR '1'='1", "\" OR \"1\"=\"1", "1' UNION SELECT NULL--"],
+    "remediation": "Use prepared statements and sanitize inputs.",
+    "references": ["https://owasp.org/www-community/attacks/SQL_Injection"],
+    "enabled": true
+  },
+  {}
+]

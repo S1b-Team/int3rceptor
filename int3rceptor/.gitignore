@@ -1,0 +1,185 @@
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+data/
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+certs/
+ca/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation builds
+docs/_build/
+site/
+
+# ============================================
+# 🔒 PROPRIETARY / SENSITIVE CODE PROTECTION
+# ============================================
+
+# Proprietary algorithms (if you want to keep some private)
+# core/src/proprietary/
+# core/src/advanced/
+
+# Commercial-only features (optional)
+# core/src/enterprise/
+# api/src/premium/
+
+# Internal tools and scripts
+scripts/internal/
+tools/private/
+.internal/
+
+# License keys and activation
+license_keys/
+*.lic
+*.license
+activation/
+
+# Customer data
+customers/
+clients/
+
+# Business documents
+contracts/
+invoices/
+proposals/
+
+# Private configuration
+config/private/
+config/production/
+secrets/
+
+# Analytics and tracking keys
+analytics.json
+tracking.json
+
+# API keys and tokens
+.api_keys
+.tokens
+credentials/
+
+# Backup files with sensitive data
+*.backup
+*.bak
+backups/
+
+# Private notes and documentation
+PRIVATE_NOTES.md
+INTERNAL_DOCS.md
+TODO_PRIVATE.md
+
+# Development databases with real data
+*.db.production
+*.sqlite.real
+
+# Compiled proprietary modules (if you pre-compile some parts)
+*.proprietary
+lib/proprietary/
+
+# Source maps (can reveal implementation details)
+*.map
+*.js.map
+
+# Private dependencies (if you have internal crates)
+vendor/private/
+.cargo/private/
+
+# ============================================
+# 🧹 INTERNAL / PERSONAL DOCS CLEANUP
+# ============================================
+CONTACT_CHANNELS_UPDATE.md
+CONTACT_UPDATE_SUMMARY.md
+FINAL_REPORT.md
+FINAL_STATUS.md
+GITHUB_SETUP.md
+IMPLEMENTATION_SUMMARY.md
+int3rceptor_ui_kit_premium.pdf
+LICENSE_PROTECTION_SUMMARY.md
+prompt.txt
+TASKS.md
+RELEASE_NOTES_v2.0.md
+DOCUMENTATION.md
+
+# Internal design docs
+docs/IMAGE_GENERATION_PROMPTS.md
+docs/PENDING_MOCKUPS.md
+docs/UI_DESIGN_SPEC.md
+docs/WATERMARKING.md
+docs/SECURITY_MECHANISMS.md
+docs/api-docs/
+docs/user-guide/
+docs/video-tutorials/
+
+# Development Metadata & Planning
+PHASE*.md
+TODAY_SUMMARY.md
+SESSION_COMPLETE.md
+PLUGIN_INTEGRATION_TRACKER.md
+PRODUCTION_PERFECT_STATUS.md
+INTRUDER_IMPLEMENTATION.md
+APP_ROADMAP.md
+DESKTOP_APP_PLAN.md
+SECURITY_IMPLEMENTATION.md
+SECURITY_FEATURES.md
+IMPLEMENTATION.md
+desktop/FULL_IMPLEMENTATION_PROGRESS.md
+
