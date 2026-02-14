@@ -48,6 +48,7 @@ impl EncryptionKeyProvider {
         // If INTERCEPTOR_UNENCRYPTED is set, allow unencrypted mode (dev/testing only)
         if std::env::var("INTERCEPTOR_UNENCRYPTED").is_ok() {
             return Ok(Self {
+                // codeql[rust/hard-coded-cryptographic-value]: Intentionally disabled encryption for dev mode
                 master_key: [0u8; 32],
                 enabled: false,
             });
@@ -65,11 +66,11 @@ impl EncryptionKeyProvider {
             return Err(anyhow!("Key must be 64 hex characters (256 bits)"));
         }
 
+        // codeql[rust/hard-coded-cryptographic-value]: Buffer initialized then filled with parsed hex data
         let mut key = [0u8; 32];
         for i in 0..32 {
             let byte_hex = &hex[i * 2..i * 2 + 2];
-            key[i] = u8::from_str_radix(byte_hex, 16)
-                .map_err(|_| anyhow!("Invalid hex in key"))?;
+            key[i] = u8::from_str_radix(byte_hex, 16).map_err(|_| anyhow!("Invalid hex in key"))?;
         }
         Ok(key)
     }
@@ -81,6 +82,7 @@ impl EncryptionKeyProvider {
 
     /// Generate new random encryption key
     pub fn generate_new() -> [u8; 32] {
+        // codeql[rust/hard-coded-cryptographic-value]: Buffer initialized then filled with random data
         let mut key = [0u8; 32];
         rand::thread_rng().fill(&mut key);
         key
@@ -100,6 +102,7 @@ impl EncryptionKeyProvider {
 impl Default for EncryptionKeyProvider {
     fn default() -> Self {
         Self::new().unwrap_or(Self {
+            // codeql[rust/hard-coded-cryptographic-value]: Fallback when key loading fails, encryption disabled
             master_key: [0u8; 32],
             enabled: false,
         })
@@ -135,13 +138,13 @@ impl EncryptedData {
         nonce.copy_from_slice(&bytes[0..12]);
 
         let ciphertext_len = u32::from_le_bytes(
-            bytes[12..16].try_into().map_err(|_| anyhow!("Invalid length field"))?
+            bytes[12..16]
+                .try_into()
+                .map_err(|_| anyhow!("Invalid length field"))?,
         ) as usize;
 
         if bytes.len() != 16 + ciphertext_len {
-            return Err(anyhow!(
-                "Invalid encrypted data format (length mismatch)"
-            ));
+            return Err(anyhow!("Invalid encrypted data format (length mismatch)"));
         }
 
         let ciphertext = bytes[16..16 + ciphertext_len].to_vec();
@@ -162,10 +165,7 @@ pub fn decrypt(key: &[u8; 32], encrypted: &EncryptedData) -> Result<Vec<u8>> {
 }
 
 /// Encrypt data if encryption is enabled
-pub fn encrypt_if_enabled(
-    provider: &EncryptionKeyProvider,
-    plaintext: &[u8],
-) -> Result<Vec<u8>> {
+pub fn encrypt_if_enabled(provider: &EncryptionKeyProvider, plaintext: &[u8]) -> Result<Vec<u8>> {
     if !provider.is_enabled() {
         return Ok(plaintext.to_vec());
     }
@@ -175,10 +175,7 @@ pub fn encrypt_if_enabled(
 }
 
 /// Decrypt data if encryption is enabled
-pub fn decrypt_if_enabled(
-    provider: &EncryptionKeyProvider,
-    data: &[u8],
-) -> Result<Vec<u8>> {
+pub fn decrypt_if_enabled(provider: &EncryptionKeyProvider, data: &[u8]) -> Result<Vec<u8>> {
     if !provider.is_enabled() {
         return Ok(data.to_vec());
     }

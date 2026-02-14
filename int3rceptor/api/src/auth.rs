@@ -46,6 +46,7 @@ pub async fn require_auth(
             .get("x-api-key")
             .and_then(|value| value.to_str().ok());
 
+        // codeql[rust/cleartext-logging]: False positive - comparing tokens, not logging
         let api_key_auth = api_key
             .map(|token| constant_time_compare(token, expected_token))
             .unwrap_or(false);

@@ -248,8 +248,11 @@ export function useWebSocket(): UseWebSocketReturn {
                 try {
                     callback(message.data, message);
                 } catch (err) {
+                    // Sanitize channel to prevent format string injection
+                    const sanitizedChannel = String(channel).replace(/[%\n\r]/g, '');
                     console.error(
-                        `[useWebSocket] Error in callback for ${channel}:`,
+                        '[useWebSocket] Error in callback for %s:',
+                        sanitizedChannel,
                         err,
                     );
                 }

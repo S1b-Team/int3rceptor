@@ -5,11 +5,11 @@
 // ║  Q1 2026 Security Hardening: License verification & data encryption      ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-use anyhow::{anyhow, Result};
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
 use rand::Rng;
@@ -53,15 +53,12 @@ pub fn verify_ed25519_signature(
         ));
     }
 
-    let public_key_array: [u8; ED25519_PUBLIC_KEY_SIZE] =
-        public_key_bytes.try_into().map_err(|_| {
-            anyhow!("Failed to parse public key bytes into array")
-        })?;
+    let public_key_array: [u8; ED25519_PUBLIC_KEY_SIZE] = public_key_bytes
+        .try_into()
+        .map_err(|_| anyhow!("Failed to parse public key bytes into array"))?;
 
-    let verifying_key =
-        VerifyingKey::from_bytes(&public_key_array).map_err(|e| {
-            anyhow!("Invalid verifying key: {}", e)
-        })?;
+    let verifying_key = VerifyingKey::from_bytes(&public_key_array)
+        .map_err(|e| anyhow!("Invalid verifying key: {}", e))?;
 
     // Parse signature
     if signature_bytes.len() != ED25519_SIGNATURE_SIZE {
@@ -72,10 +69,9 @@ pub fn verify_ed25519_signature(
         ));
     }
 
-    let signature_array: [u8; ED25519_SIGNATURE_SIZE] =
-        signature_bytes.try_into().map_err(|_| {
-            anyhow!("Failed to parse signature bytes into array")
-        })?;
+    let signature_array: [u8; ED25519_SIGNATURE_SIZE] = signature_bytes
+        .try_into()
+        .map_err(|_| anyhow!("Failed to parse signature bytes into array"))?;
 
     let signature = Signature::from_bytes(&signature_array);
 
@@ -89,18 +85,21 @@ pub fn verify_ed25519_signature(
 /// Encrypts data with AES-256-GCM
 ///
 /// Returns (ciphertext + tag, nonce) suitable for storage
-pub fn encrypt_aes256_gcm(key: &[u8; 32], plaintext: &[u8]) -> Result<(Vec<u8>, [u8; GCM_NONCE_SIZE])> {
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| {
-        anyhow!("Failed to initialize AES-256-GCM cipher")
-    })?;
+pub fn encrypt_aes256_gcm(
+    key: &[u8; 32],
+    plaintext: &[u8],
+) -> Result<(Vec<u8>, [u8; GCM_NONCE_SIZE])> {
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|_| anyhow!("Failed to initialize AES-256-GCM cipher"))?;
 
+    // codeql[rust/hard-coded-cryptographic-value]: Buffer initialized with zeros then filled with random data
     let mut nonce_bytes = [0u8; GCM_NONCE_SIZE];
     rand::thread_rng().fill(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let ciphertext = cipher.encrypt(nonce, plaintext).map_err(|e| {
-        anyhow!("Encryption failed: {}", e)
-    })?;
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext)
+        .map_err(|e| anyhow!("Encryption failed: {}", e))?;
 
     Ok((ciphertext, nonce_bytes))
 }
@@ -111,15 +110,14 @@ pub fn decrypt_aes256_gcm(
     ciphertext: &[u8],
     nonce: &[u8; GCM_NONCE_SIZE],
 ) -> Result<Vec<u8>> {
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| {
-        anyhow!("Failed to initialize AES-256-GCM cipher")
-    })?;
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|_| anyhow!("Failed to initialize AES-256-GCM cipher"))?;
 
     let nonce_slice = Nonce::from_slice(nonce);
 
-    let plaintext = cipher.decrypt(nonce_slice, ciphertext.as_ref()).map_err(|e| {
-        anyhow!("Decryption failed: {}", e)
-    })?;
+    let plaintext = cipher
+        .decrypt(nonce_slice, ciphertext.as_ref())
+        .map_err(|e| anyhow!("Decryption failed: {}", e))?;
 
     Ok(plaintext)
 }
@@ -130,7 +128,7 @@ pub fn derive_key_from_password(password: &str, salt: &[u8; 16]) -> Result<[u8; 
 
     let argon2 = Argon2::default();
     let mut output_key = [0u8; 32];
-    
+
     argon2
         .hash_password_into(password.as_bytes(), salt.as_slice(), &mut output_key)
         .map_err(|e| anyhow!("Key derivation failed: {}", e))?;
@@ -158,6 +156,7 @@ mod tests {
 
     #[test]
     fn test_aes256_gcm_roundtrip() {
+        // codeql[rust/hard-coded-cryptographic-value]: Test-only key, not used in production
         let key = [0u8; 32];
         let plaintext = b"sensitive data";
 
@@ -169,7 +168,9 @@ mod tests {
 
     #[test]
     fn test_key_derivation() {
+        // codeql[rust/hard-coded-cryptographic-value]: Test-only credentials, not used in production
         let password = "test-password";
+        // codeql[rust/hard-coded-cryptographic-value]: Test-only salt, not used in production
         let salt = [1u8; 16];
 
         let key1 = derive_key_from_password(password, &salt).unwrap();

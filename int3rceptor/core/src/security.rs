@@ -885,6 +885,7 @@ impl AuditEntryBuilder {
     }
 
     pub fn user_id(mut self, id: Option<&str>) -> Self {
+        // codeql[rust/cleartext-logging]: False positive - this is a setter method, not logging
         self.user_id = id.map(String::from);
         self
     }
