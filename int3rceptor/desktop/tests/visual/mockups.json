@@ -1,0 +1,59 @@
+{
+  "mappings": [
+    {
+      "view": "dashboard",
+      "mockupPath": "../../docs/mockups/dashboard-mockup.png",
+      "route": "/dashboard"
+    },
+    {
+      "view": "traffic",
+      "mockupPath": "../../docs/mockups/traffic-tab_mockup.png",
+      "route": "/traffic"
+    },
+    {
+      "view": "intruder",
+      "mockupPath": "../../docs/mockups/intruder-tab_mockup.png",
+      "route": "/intruder"
+    },
+    {
+      "view": "repeater",
+      "mockupPath": "../../docs/mockups/repeater-tab_mockup.png",
+      "route": "/repeater"
+    },
+    {
+      "view": "websocket",
+      "mockupPath": "../../docs/mockups/WebSocket Interception Tab_mockup.png",
+      "route": "/websocket"
+    },
+    {
+      "view": "loading",
+      "mockupPath": "../../docs/mockups/loading_mockup.png",
+      "route": "/loading"
+    },
+    {
+      "view": "scanner",
+      "mockupPath": null,
+      "route": "/scanner"
+    },
+    {
+      "view": "settings",
+      "mockupPath": null,
+      "route": "/settings"
+    },
+    {
+      "view": "plugins",
+      "mockupPath": null,
+      "route": "/plugins"
+    },
+    {
+      "view": "decoder",
+      "mockupPath": null,
+      "route": "/decoder"
+    },
+    {
+      "view": "comparer",
+      "mockupPath": null,
+      "route": "/comparer"
+    }
+  ]
+}

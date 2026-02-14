@@ -1,3 +1,32 @@
+// Dashboard types
+export type {
+    SystemMetrics,
+    MetricPoint,
+    TimeSeriesData,
+    MetricCardProps,
+    HealthLevel,
+    HealthStatus,
+    HealthGaugeData,
+    ActivityEntry,
+    TopEndpoint,
+    ConnectionStats,
+    ConnectionBreakdown,
+    ProxyStatus,
+    ProxyConfig,
+    DashboardState,
+    MetricsUpdate,
+    DashboardEvent,
+    ChartDataPoint,
+    ThresholdConfig,
+    FormatOptions,
+    UseDashboardMetricsReturn,
+    UseDashboardWebSocketReturn,
+    UseSystemHealthReturn,
+    DashboardExportData,
+    PaginationOptions,
+    ApiResponse,
+} from "./dashboard";
+
 export interface CapturedRequest {
     id: number;
     timestamp_ms: number;
@@ -236,22 +265,11 @@ export interface ConnectionSummary {
     secure: boolean;
 }
 
-export type ConnectionState =
-    | "connecting"
-    | "open"
-    | "closing"
-    | "closed"
-    | "failed";
+export type ConnectionState = "connecting" | "open" | "closing" | "closed" | "failed";
 
 export type FrameDirection = "sent" | "received";
 
-export type FrameType =
-    | "text"
-    | "binary"
-    | "close"
-    | "ping"
-    | "pong"
-    | "continuation";
+export type FrameType = "text" | "binary" | "close" | "ping" | "pong" | "continuation";
 
 export interface WebSocketFrame {
     id: number;

@@ -49,6 +49,22 @@ pub struct CaptureEntry {
     pub response: Option<CapturedResponse>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardActivity {
+    pub timestamp: i64,
+    pub event_type: String,
+    pub message: String,
+    pub level: String,
+    pub details: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct ActivityQuery {
+    pub limit: Option<usize>,
+    pub event_type: Option<String>,
+    pub level: Option<String>,
+}
+
 #[derive(Debug)]
 pub struct RequestCapture {
     capacity: usize,
@@ -56,6 +72,8 @@ pub struct RequestCapture {
     counter: AtomicU64,
     notifier: broadcast::Sender<CaptureEntry>,
     storage: Option<Arc<CaptureStorage>>,
+    activities: RwLock<VecDeque<DashboardActivity>>,
+    activity_counter: AtomicU64,
 }
 
 impl RequestCapture {
@@ -96,6 +114,8 @@ impl RequestCapture {
             counter: AtomicU64::new(max_id + 1),
             notifier: tx,
             storage,
+            activities: RwLock::new(VecDeque::new()),
+            activity_counter: AtomicU64::new(1),
         }
     }
 
@@ -167,6 +187,51 @@ impl RequestCapture {
             .take(filter.limit.unwrap_or(guard.len()))
             .cloned()
             .collect()
+    }
+
+    // Activity log methods
+
+    pub fn log_activity(&self, event_type: impl Into<String>, message: impl Into<String>, level: impl Into<String>, details: Option<serde_json::Value>) {
+        let activity = DashboardActivity {
+            timestamp: OffsetDateTime::now_utc().unix_timestamp(),
+            event_type: event_type.into(),
+            message: message.into(),
+            level: level.into(),
+            details,
+        };
+        let mut guard = self.activities.write();
+        guard.push_front(activity);
+        // Keep max 1000 activities
+        const MAX_ACTIVITIES: usize = 1000;
+        while guard.len() > MAX_ACTIVITIES {
+            guard.pop_back();
+        }
+    }
+
+    pub fn get_activity(&self, filter: &ActivityQuery) -> Vec<DashboardActivity> {
+        let guard = self.activities.read();
+        guard
+            .iter()
+            .filter(|activity| {
+                if let Some(event_type) = &filter.event_type {
+                    if &activity.event_type != event_type {
+                        return false;
+                    }
+                }
+                if let Some(level) = &filter.level {
+                    if &activity.level != level {
+                        return false;
+                    }
+                }
+                true
+            })
+            .take(filter.limit.unwrap_or(guard.len()))
+            .cloned()
+            .collect()
+    }
+
+    pub fn clear_activity(&self) {
+        self.activities.write().clear();
     }
 }
 

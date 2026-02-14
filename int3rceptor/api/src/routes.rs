@@ -1,7 +1,7 @@
 use crate::{
     models::{
-        AppSettings, HeaderPatch, ManualRequest, ManualResponse, PluginInfo, PluginToggle,
-        RepeatRequest,
+        ActivityQuery, AppSettings, DashboardActivity, HeaderPatch, ManualRequest, ManualResponse,
+        PluginInfo, PluginToggle, RepeatRequest,
     },
     state::AppState,
 };
@@ -151,6 +151,8 @@ pub fn router() -> Router {
         .route("/api/metrics", get(get_metrics))
         .route("/api/metrics/reset", post(reset_metrics))
         .route("/api/health", get(health_check))
+        .route("/api/dashboard/activity", get(get_dashboard_activity))
+        .route("/api/dashboard/activity/clear", delete(clear_dashboard_activity))
         // Security management routes
         .route(
             "/api/security/ip-filter",
@@ -605,6 +607,21 @@ async fn health_check(Extension(state): Extension<Arc<AppState>>) -> impl IntoRe
         "requests_total": m.requests_total,
         "capture_count": state.capture.len(),
     }))
+}
+
+// Dashboard Activity handlers
+
+async fn get_dashboard_activity(
+    Query(params): Query<ActivityQuery>,
+    Extension(state): Extension<Arc<AppState>>,
+) -> impl IntoResponse {
+    let activities = state.capture.get_activity(&params);
+    Json(activities)
+}
+
+async fn clear_dashboard_activity(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    state.capture.clear_activity();
+    StatusCode::NO_CONTENT
 }
 
 async fn send_manual_request(Json(payload): Json<ManualRequest>) -> impl IntoResponse {

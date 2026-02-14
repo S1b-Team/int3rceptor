@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// Re-export from core for consistency
+pub use interceptor_core::{ActivityQuery, DashboardActivity};
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HeaderPatch {
     pub name: String,

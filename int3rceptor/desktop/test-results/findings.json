@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-01-26T18:26:29.462Z",
+  "summary": {
+    "totalSuites": 4,
+    "passedSuites": 4,
+    "failedSuites": 0,
+    "totalDuration": 0
+  },
+  "suites": {
+    "crossBrowser": {
+      "name": "Cross-Browser Compatibility",
+      "status": "unknown",
+      "passed": 0,
+      "failed": 0,
+      "duration": 0,
+      "issues": []
+    },
+    "accessibility": {
+      "name": "Accessibility",
+      "status": "unknown",
+      "passed": 0,
+      "failed": 0,
+      "duration": 0,
+      "issues": []
+    },
+    "visual": {
+      "name": "Visual Regression",
+      "status": "unknown",
+      "passed": 0,
+      "failed": 0,
+      "duration": 0,
+      "issues": []
+    },
+    "performance": {
+      "name": "Performance",
+      "status": "passed",
+      "passed": 0,
+      "failed": 0,
+      "duration": 0,
+      "metrics": {},
+      "issues": []
+    }
+  },
+  "recommendations": []
+}

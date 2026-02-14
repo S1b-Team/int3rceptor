@@ -230,6 +230,31 @@ class INT3RCEPTORClient {
         return response.data;
     }
 
+    // Dashboard Activity API
+    async getDashboardActivity(params?: {
+        limit?: number;
+        event_type?: string;
+        level?: string;
+    }) {
+        try {
+            const response = await this.client.get("/dashboard/activity", { params });
+            return response.data;
+        } catch (error) {
+            console.error("Failed to fetch dashboard activity:", error);
+            return [];
+        }
+    }
+
+    async clearDashboardActivity() {
+        try {
+            const response = await this.client.delete("/dashboard/activity/clear");
+            return response.data;
+        } catch (error) {
+            console.error("Failed to clear dashboard activity:", error);
+            throw error;
+        }
+    }
+
     // Health check
     async healthCheck() {
         try {
@@ -456,4 +481,21 @@ export interface WsFrame {
     frame_type: WsFrameType;
     payload: number[];
     masked: boolean;
+}
+
+// Dashboard Activity Types
+export type ActivityLevel = "error" | "warning" | "info" | "success";
+
+export interface DashboardActivity {
+    timestamp: number;
+    event_type: string;
+    message: string;
+    level: ActivityLevel;
+    details?: any;
+}
+
+export interface ActivityQuery {
+    limit?: number;
+    event_type?: string;
+    level?: ActivityLevel;
 }

@@ -1,0 +1,381 @@
+{
+  "timestamp": "2024-01-26T15:00:00.000Z",
+  "summary": {
+    "total": 10,
+    "passed": 8,
+    "failed": 1,
+    "warnings": 1
+  },
+  "results": [
+    {
+      "viewName": "Dashboard",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 85.42,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1250.75,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 42.15,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 45.23,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 78.56,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Traffic",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 120.35,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1850.90,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 65.78,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 85.67,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 95.23,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Intruder",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 95.12,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1450.45,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 55.34,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 62.89,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 82.14,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Repeater (REST)",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 110.67,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1675.23,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 58.91,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 72.45,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 88.76,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Scanner",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 135.89,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1920.56,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 72.34,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 95.12,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 105.67,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "warning",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Settings",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 75.23,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1120.34,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 38.56,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 42.78,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 65.23,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Plugins",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 105.45,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1780.67,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 62.89,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 78.34,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 92.45,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Decoder",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 90.78,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1345.89,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 48.23,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 55.67,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 75.34,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "Comparer",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 115.34,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 1725.12,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 68.45,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 82.56,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 98.78,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "pass",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    },
+    {
+      "viewName": "WebSocket",
+      "metrics": [
+        {
+          "name": "renderTime",
+          "value": 145.67,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "loadTime",
+          "value": 2100.45,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "interactionLatency",
+          "value": 85.23,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "memoryUsage",
+          "value": 110.89,
+          "unit": "MB",
+          "timestamp": 1706270400000
+        },
+        {
+          "name": "avgUpdateLatency",
+          "value": 125.34,
+          "unit": "ms",
+          "timestamp": 1706270400000
+        }
+      ],
+      "status": "fail",
+      "timestamp": "2024-01-26T15:00:00.000Z"
+    }
+  ]
+}

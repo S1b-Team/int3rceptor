@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { apiClient } from './api/client'
-import Badge from './components/base/Badge.vue'
 import Button from './components/base/Button.vue'
 import ComparerView from './components/views/ComparerView.vue'
 import DecoderView from './components/views/DecoderView.vue'
@@ -13,6 +12,7 @@ import ScannerView from './components/views/ScannerView.vue'
 import SettingsView from './components/views/SettingsView.vue'
 import TrafficView from './components/views/TrafficView.vue'
 import WebSocketView from './components/views/WebSocketView.vue'
+import DashboardView from './components/views/DashboardView.vue'
 
 import { storeToRefs } from 'pinia'
 import { useUiStore } from './stores/ui'
@@ -25,8 +25,6 @@ const stats = ref({
   memory: 0,
   connections: 0,
 })
-
-const recentRequests = ref<TrafficItem[]>([])
 
 const tabs = [
   { id: 'dashboard', name: 'Dashboard', icon: '📊' },
@@ -52,10 +50,6 @@ async function fetchStats() {
       stats.value.memory = data.memory || 0
       stats.value.connections = data.connections || 0
     }
-
-    // Fetch recent traffic
-    const traffic = await apiClient.getTraffic(5)
-    recentRequests.value = traffic
   } catch (error) {
     // Backend not ready yet
   }
@@ -257,57 +251,7 @@ async function handleLoadProject() {
       <!-- View Content -->
       <main class="flex-1 p-6 overflow-hidden relative">
         <!-- Dashboard View -->
-        <div v-if="currentTab === 'dashboard'" class="h-full flex flex-col gap-6 animate-fade-in">
-          <!-- Welcome Hero -->
-          <div class="panel bg-gradient-to-r from-i3-bg-alt to-i3-bg border-l-4 border-l-i3-cyan">
-            <h1 class="text-3xl font-heading font-bold text-i3-cyan mb-2">Welcome to INT3RCEPTOR</h1>
-            <p class="text-i3-text-secondary">The most advanced HTTP/HTTPS intercepting proxy built with Rust 🦀</p>
-          </div>
-
-          <!-- Feature Grid -->
-          <div class="grid grid-cols-3 gap-6">
-            <div class="panel hover:border-i3-orange transition-colors group">
-              <div class="text-i3-orange text-xl mb-2 group-hover:scale-110 transition-transform origin-left">⚡ HTTP/2 Support</div>
-              <p class="text-sm text-i3-text-muted">Full multiplexing and server push</p>
-            </div>
-            <div class="panel hover:border-i3-magenta transition-colors group">
-              <div class="text-i3-magenta text-xl mb-2 group-hover:scale-110 transition-transform origin-left">🔌 WASM Plugins</div>
-              <p class="text-sm text-i3-text-muted">Extend with any language</p>
-            </div>
-            <div class="panel hover:border-i3-cyan transition-colors group">
-              <div class="text-i3-cyan text-xl mb-2 group-hover:scale-110 transition-transform origin-left">🚀 10x Faster</div>
-              <p class="text-sm text-i3-text-muted">Rust-powered performance</p>
-            </div>
-          </div>
-
-          <!-- Recent Requests Table (Placeholder) -->
-          <div class="panel flex-1 flex flex-col">
-            <h3 class="text-lg font-bold text-i3-cyan mb-4">Recent Requests</h3>
-            <div class="flex-1 overflow-auto">
-              <table class="w-full text-sm text-left">
-                <thead class="text-xs uppercase text-i3-text-muted border-b border-i3-border">
-                  <tr>
-                    <th class="py-2">Method</th>
-                    <th class="py-2">URL</th>
-                    <th class="py-2">Status</th>
-                    <th class="py-2">Size</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-i3-border">
-                  <tr v-for="req in recentRequests" :key="req.id" class="hover:bg-i3-bg-alt/50 transition-colors">
-                    <td class="py-3"><Badge :variant="req.method === 'GET' ? 'cyan' : req.method === 'POST' ? 'orange' : 'magenta'">{{ req.method }}</Badge></td>
-                    <td class="py-3 text-i3-text truncate max-w-[200px]" :title="req.url">{{ req.url }}</td>
-                    <td class="py-3"><Badge variant="cyan" outline>{{ req.status }}</Badge></td>
-                    <td class="py-3 text-i3-text-secondary">{{ req.size }} B</td>
-                  </tr>
-                  <tr v-if="recentRequests.length === 0">
-                    <td colspan="4" class="py-4 text-center text-i3-text-muted">No requests captured yet</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <DashboardView v-if="currentTab === 'dashboard'" />
 
         <!-- Traffic View -->
         <TrafficView v-else-if="currentTab === 'traffic'" />

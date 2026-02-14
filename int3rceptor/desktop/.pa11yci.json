@@ -1,0 +1,67 @@
+{
+  "defaults": {
+    "standard": "WCAG2AA",
+    "threshold": 0,
+    "reporters": [
+      "html",
+      "json"
+    ],
+    "reporter": "html",
+    "reporterOptions": {
+      "outputDir": "test-results/pa11y/reports"
+    },
+    "chromeLaunchConfig": {
+      "args": [
+        "--no-sandbox",
+        "--disable-setuid-sandbox"
+      ]
+    },
+    "ignore": [
+      "WCAG2AA.Principle1.Guideline1_3.1_3_1.F92,ARIA4",
+      "WCAG2AA.Principle1.Guideline1_3.1_3_1.F92,ARIA4"
+    ],
+    "hideElements": ".sr-only, [aria-hidden='true']"
+  },
+  "urls": [
+    {
+      "url": "http://localhost:5173/",
+      "screenCapture": "test-results/pa11y/screenshots/dashboard.png"
+    },
+    {
+      "url": "http://localhost:5173/traffic",
+      "screenCapture": "test-results/pa11y/screenshots/traffic.png"
+    },
+    {
+      "url": "http://localhost:5173/intruder",
+      "screenCapture": "test-results/pa11y/screenshots/intruder.png"
+    },
+    {
+      "url": "http://localhost:5173/rest",
+      "screenCapture": "test-results/pa11y/screenshots/rest.png"
+    },
+    {
+      "url": "http://localhost:5173/scanner",
+      "screenCapture": "test-results/pa11y/screenshots/scanner.png"
+    },
+    {
+      "url": "http://localhost:5173/settings",
+      "screenCapture": "test-results/pa11y/screenshots/settings.png"
+    },
+    {
+      "url": "http://localhost:5173/plugins",
+      "screenCapture": "test-results/pa11y/screenshots/plugins.png"
+    },
+    {
+      "url": "http://localhost:5173/decoder",
+      "screenCapture": "test-results/pa11y/screenshots/decoder.png"
+    },
+    {
+      "url": "http://localhost:5173/comparer",
+      "screenCapture": "test-results/pa11y/screenshots/comparer.png"
+    },
+    {
+      "url": "http://localhost:5173/websocket",
+      "screenCapture": "test-results/pa11y/screenshots/websocket.png"
+    }
+  ]
+}

@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Test Report - INT3RCEPTOR UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header .timestamp {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .summary-card h3 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        .summary-card p {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .summary-card.total h3 { color: #667eea; }
+        .summary-card.passed h3 { color: #10b981; }
+        .summary-card.failed h3 { color: #ef4444; }
+        .summary-card.warnings h3 { color: #f59e0b; }
+        .results {
+            padding: 30px;
+        }
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .result-card.status-pass { border-left-color: #10b981; }
+        .result-card.status-fail { border-left-color: #ef4444; }
+        .result-card.status-warning { border-left-color: #f59e0b; }
+        .result-card h3 {
+            display: inline-block;
+            margin-right: 15px;
+            font-size: 1.3em;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-badge.pass { background: #d1fae5; color: #065f46; }
+        .status-badge.fail { background: #fee2e2; color: #991b1b; }
+        .status-badge.warning { background: #fef3c7; color: #92400e; }
+        .metrics-table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+        }
+        .metrics-table th,
+        .metrics-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .metrics-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+            color: #374151;
+        }
+        .status-pass { color: #10b981; font-weight: bold; }
+        .status-fail { color: #ef4444; font-weight: bold; }
+        .status-warning { color: #f59e0b; font-weight: bold; }
+        .comparison {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .comparison h4 {
+            margin-bottom: 10px;
+            color: #374151;
+        }
+        .comparison-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .comparison-stats span {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .comparison-stats .improved { background: #d1fae5; color: #065f46; }
+        .comparison-stats .degraded { background: #fee2e2; color: #991b1b; }
+        .comparison-stats .unchanged { background: #f3f4f6; color: #4b5563; }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Performance Test Report</h1>
+            <div class="timestamp">Generated: 2024-01-26T15:00:00.000Z</div>
+        </div>
+
+        <div class="summary">
+            <div class="summary-card total">
+                <h3>10</h3>
+                <p>Total Tests</p>
+            </div>
+            <div class="summary-card passed">
+                <h3>8</h3>
+                <p>Passed</p>
+            </div>
+            <div class="summary-card failed">
+                <h3>1</h3>
+                <p>Failed</p>
+            </div>
+            <div class="summary-card warnings">
+                <h3>1</h3>
+                <p>Warnings</p>
+            </div>
+        </div>
+
+        <div class="results">
+            <div class="result-card status-pass">
+                <h3>Dashboard</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>85.42</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1250.75</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>42.15</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>45.23</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>78.56</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-pass">
+                <h3>Traffic</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>120.35</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1850.90</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>65.78</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>85.67</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>95.23</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-pass">
+                <h3>Intruder</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>95.12</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1450.45</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>55.34</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>62.89</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>82.14</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-pass">
+                <h3>Repeater (REST)</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>110.67</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1675.23</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>58.91</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>72.45</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>88.76</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-warning">
+                <h3>Scanner</h3>
+                <div class="status-badge warning">WARNING</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>135.89</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1920.56</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>72.34</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>95.12</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>105.67</td>
+                            <td>ms</td>
+                            <td class="status-warning">warning</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-pass">
+                <h3>Settings</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>75.23</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1120.34</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>38.56</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>42.78</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>65.23</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-pass">
+                <h3>Plugins</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>105.45</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1780.67</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>62.89</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>78.34</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>92.45</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-pass">
+                <h3>Decoder</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>90.78</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1345.89</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>48.23</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>55.67</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>75.34</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-pass">
+                <h3>Comparer</h3>
+                <div class="status-badge pass">PASS</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>115.34</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>1725.12</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>68.45</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>82.56</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>98.78</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="result-card status-fail">
+                <h3>WebSocket</h3>
+                <div class="status-badge fail">FAIL</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>renderTime</td>
+                            <td>145.67</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>loadTime</td>
+                            <td>2100.45</td>
+                            <td>ms</td>
+                            <td class="status-fail">fail</td>
+                        </tr>
+                        <tr>
+                            <td>interactionLatency</td>
+                            <td>85.23</td>
+                            <td>ms</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>memoryUsage</td>
+                            <td>110.89</td>
+                            <td>MB</td>
+                            <td class="status-pass">pass</td>
+                        </tr>
+                        <tr>
+                            <td>avgUpdateLatency</td>
+                            <td>125.34</td>
+                            <td>ms</td>
+                            <td class="status-fail">fail</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer">
+            INT3RCEPTOR UI Performance Testing Suite
+        </div>
+    </div>
+</body>
+</html>

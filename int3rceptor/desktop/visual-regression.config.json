@@ -1,0 +1,63 @@
+{
+  "threshold": 0.1,
+  "maxDiffPixels": 100,
+  "failOnRegression": true,
+  "generateDiffImages": "always",
+  "fullPage": true,
+  "animations": "disabled",
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "name": "laptop",
+      "width": 1366,
+      "height": 768
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "mobile",
+      "width": 375,
+      "height": 667
+    }
+  ],
+  "browsers": [
+    "chromium",
+    "firefox",
+    "webkit"
+  ],
+  "directories": {
+    "baselines": "test-results/baselines",
+    "actuals": "test-results/actuals",
+    "diffs": "test-results/diffs",
+    "reports": "test-results/reports"
+  },
+  "mockupComparison": {
+    "enabled": true,
+    "configFile": "tests/visual/mockups.json",
+    "threshold": 0.1,
+    "generateDiffImages": true
+  },
+  "baselineManagement": {
+    "autoUpdate": false,
+    "requireApproval": true,
+    "gitTracked": true
+  },
+  "reporting": {
+    "format": ["html", "json"],
+    "outputDir": "test-results/reports",
+    "includeScreenshots": true,
+    "includeDiffs": true
+  },
+  "timeout": {
+    "pageLoad": 30000,
+    "stability": 5000,
+    "screenshot": 10000
+  }
+}

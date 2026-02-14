@@ -22,7 +22,7 @@ pub mod telemetry;
 pub mod tls;
 pub mod websocket;
 
-pub use capture::{CaptureQuery, RequestCapture};
+pub use capture::{ActivityQuery, CaptureQuery, DashboardActivity, RequestCapture};
 pub use cert_manager::CertManager;
 pub use comparer::{CompareMode, CompareRequest, CompareResponse, Comparer};
 pub use connection_pool::ConnectionPool;

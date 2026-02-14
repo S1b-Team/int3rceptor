@@ -1,367 +1,705 @@
-<script setup lang="ts">
-import { onMounted, ref } from "vue";
-
-interface License {
-    type: "Free" | "Pro" | "Enterprise";
-    expiresAt: string | null;
-    features: string[];
-}
-
-interface User {
-    id: string;
-    email: string;
-    avatarUrl?: string;
-}
-
-interface Plugin {
-    name: string;
-    version: string;
-    description: string;
-    installed: boolean;
-    premium: boolean;
-}
-
-const user = ref<User | null>(null);
-const license = ref<License | null>(null);
-const plugins = ref<Plugin[]>([]);
-const loading = ref(true);
-const error = ref<string | null>(null);
-
-onMounted(async () => {
-    try {
-        // Fetch license info
-        const licenseRes = await fetch("http://localhost:3000/api/license");
-        if (licenseRes.ok) {
-            const data = await licenseRes.json();
-
-            // Map backend license to UI model
-            const backendLicense = data.license;
-            const tier = data.tier;
-
-            license.value = {
-                type: tier, // "Free", "Professional", "Enterprise"
-                expiresAt: backendLicense?.expires_at
-                    ? new Date(backendLicense.expires_at * 1000).toISOString().split('T')[0]
-                    : "Never",
-                features: Object.entries(data.features)
-                    .filter(([_, enabled]) => enabled)
-                    .map(([feature, _]) => feature.charAt(0).toUpperCase() + feature.slice(1)),
-            };
-
-            // Mock user info from license data if available, otherwise generic
-            user.value = {
-                id: backendLicense?.hardware_id || "unknown",
-                email: backendLicense?.licensee || "Free User",
-                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${backendLicense?.licensee || 'Free'}`,
-            };
-        }
-
-        // Fetch plugins
-        const pluginsRes = await fetch("http://localhost:3000/api/plugins");
-        if (pluginsRes.ok) {
-            const data = await pluginsRes.json();
-            plugins.value = data.map((p: any) => ({
-                name: p.name,
-                version: p.version,
-                description: p.description,
-                installed: p.enabled,
-                premium: false, // Backend doesn't send this yet
-            }));
-        }
-    } catch (e: any) {
-        error.value = "Failed to load dashboard data: " + e.message;
-        console.error(e);
-    } finally {
-        loading.value = false;
-    }
-});
-</script>
-
 <template>
     <div class="dashboard-tab">
+        <!-- Header with status and controls -->
         <div class="dashboard-header">
-            <h2 class="dashboard-title">
-                <span class="icon">👤</span> User Dashboard
-            </h2>
+            <div class="header-left">
+                <h1 class="dashboard-title">📊 Dashboard</h1>
+                <span class="subtitle">Real-time metrics & system health</span>
+            </div>
+            <div class="header-right">
+                <div class="status-indicators">
+                    <div class="status-item">
+                        <span class="status-label">Proxy</span>
+                        <span class="status-badge" :class="proxyRunning ? 'running' : 'stopped'">
+                            {{ proxyRunning ? "● Running" : "○ Stopped" }}
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">WS</span>
+                        <span
+                            class="status-badge"
+                            :class="wsConnected ? 'connected' : 'disconnected'"
+                        >
+                            {{ wsConnected ? "● Connected" : "○ Offline" }}
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Requests</span>
+                        <span class="status-value"
+                            >{{ metrics?.requests_per_sec.toFixed(0) ?? "0" }}/s</span
+                        >
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Memory</span>
+                        <span class="status-value"
+                            >{{ metrics?.memory_usage_mb.toFixed(1) ?? "0" }}MB</span
+                        >
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">API</span>
+                        <span
+                            class="status-badge"
+                            :class="{ 'api-live': !isLoading, 'api-loading': isLoading }"
+                        >
+                            {{ isLoading ? "⏳ Fetching..." : "✓ Live" }}
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Last Update</span>
+                        <span class="status-value">{{ formatLastUpdate }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div v-if="loading" class="loading-state">Loading user profile...</div>
+        <!-- Error Alert -->
+        <div v-if="error && showErrorNotification" class="error-alert">
+            <span class="error-icon">⚠️</span>
+            <span class="error-message">{{ error }}</span>
+            <button class="close-btn" @click="dismissError">✕</button>
+        </div>
 
-        <div v-else class="dashboard-content">
-            <!-- User Profile Card -->
-            <div class="card profile-card">
-                <div class="profile-header">
-                    <img :src="user?.avatarUrl" alt="Avatar" class="avatar" />
-                    <div class="user-info">
-                        <h3>{{ user?.email }}</h3>
-                        <span class="user-id">ID: {{ user?.id }}</span>
-                    </div>
-                    <div
-                        class="license-badge"
-                        :class="license?.type.toLowerCase()"
-                    >
-                        {{ license?.type }}
-                    </div>
-                </div>
+        <!-- Loading State -->
+        <div v-if="isLoading && !metrics" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading dashboard metrics...</p>
+        </div>
 
-                <div class="license-details">
-                    <div class="detail-row">
-                        <span class="label">Expires:</span>
-                        <span class="value">{{
-                            license?.expiresAt ?? "Never"
-                        }}</span>
-                    </div>
-                    <div class="features-list">
-                        <h4>Active Features:</h4>
-                        <ul>
-                            <li
-                                v-for="feature in license?.features"
-                                :key="feature"
-                            >
-                                ✓ {{ feature }}
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+        <!-- Main Content -->
+        <template v-else-if="metrics">
+            <div class="dashboard-content">
+                <!-- Metrics Grid -->
+                <MetricsGrid :metrics="metrics" :time-series="timeSeries" :is-loading="isLoading" />
+
+                <!-- System Health Panel -->
+                <SystemHealthPanel :metrics="metrics" :proxy-running="proxyRunning" />
+
+                <!-- Activity Chart -->
+                <ActivityChart :time-series="timeSeries" />
+
+                <!-- Connection Graph -->
+                <ConnectionGraph :connections="connectionStats" :metrics="metrics" />
+
+                <!-- Recent Activity Panel -->
+                <RecentActivityPanel
+                    :activities="recentActivity"
+                    :max-display="10"
+                    @refresh="refreshActivity"
+                    @clear="clearActivity"
+                    @action="(activity: any) => handleActivityAction(activity)"
+                />
             </div>
 
-            <!-- Plugins Section -->
-            <div class="card plugins-card">
-                <h3>Available Plugins</h3>
-                <div class="plugins-list">
-                    <div
-                        v-for="plugin in plugins"
-                        :key="plugin.name"
-                        class="plugin-item"
-                    >
-                        <div class="plugin-info">
-                            <div class="plugin-name-row">
-                                <h4>{{ plugin.name }}</h4>
-                                <span v-if="plugin.premium" class="premium-tag"
-                                    >PREMIUM</span
-                                >
-                            </div>
-                            <p>{{ plugin.description }}</p>
-                            <span class="version">v{{ plugin.version }}</span>
-                        </div>
-                        <div class="plugin-actions">
-                            <button
-                                v-if="plugin.installed"
-                                class="btn-installed"
-                                disabled
-                            >
-                                Installed
-                            </button>
-                            <button v-else class="btn-install">Install</button>
-                        </div>
-                    </div>
-                </div>
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <button class="btn-primary" @click="toggleProxy" :disabled="isUpdating">
+                    {{ proxyRunning ? "⏹️ Stop Proxy" : "▶️ Start Proxy" }}
+                </button>
+                <button class="btn-secondary" @click="clearTraffic" :disabled="isUpdating">
+                    🗑️ Clear Traffic
+                </button>
+                <button class="btn-secondary" @click="handleRefresh" :disabled="isLoading">
+                    🔄 Refresh
+                </button>
+                <button class="btn-secondary" @click="exportMetrics" :disabled="isUpdating">
+                    📥 Export
+                </button>
+                <button class="btn-secondary" @click="openSettings">⚙️ Settings</button>
             </div>
+        </template>
+
+        <!-- Empty State -->
+        <div v-else class="empty-state">
+            <p>No metrics available</p>
         </div>
     </div>
 </template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { useDashboardMetrics } from "@/composables/dashboard/useDashboardMetrics";
+import MetricsGrid from "./dashboard/MetricsGrid.vue";
+import SystemHealthPanel from "./dashboard/SystemHealthPanel.vue";
+import ActivityChart from "./dashboard/ActivityChart.vue";
+import ConnectionGraph from "./dashboard/ConnectionGraph.vue";
+import RecentActivityPanel from "./dashboard/RecentActivityPanel.vue";
+import { formatTime } from "@/utils/dashboard/formatters";
+import type {
+    SystemMetrics,
+    TimeSeriesData,
+    ActivityEntry,
+    ConnectionStats,
+} from "@/types/dashboard";
+
+// Composables
+const {
+    metrics,
+    isLoading,
+    error,
+    lastUpdated,
+    timeSinceUpdate,
+    startAutoFetch,
+    stopAutoFetch,
+    clearError,
+    fetchMetrics,
+} = useDashboardMetrics();
+
+// State
+const wsConnected = ref(false);
+const proxyRunning = ref(true);
+const isUpdating = ref(false);
+const showErrorNotification = ref(false);
+let errorNotificationTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const timeSeries = ref<Map<string, TimeSeriesData>>(new Map());
+const recentActivity = ref<
+    Array<{
+        id: string;
+        timestamp: number;
+        type: "request" | "error" | "warning" | "info";
+        message: string;
+        actionLabel?: string;
+        details?: string;
+    }>
+>([]);
+const connectionStats = ref<ConnectionStats>({
+    active: 8,
+    established: 6,
+    closing: 1,
+    failed: 0,
+    total_lifetime: 150,
+    avg_duration_ms: 2500,
+    peak_connections: 45,
+    peak_time: Date.now() - 3600000,
+    concurrent_limit: 100,
+});
+
+// Computed properties
+const formatLastUpdate = computed(() => {
+    if (!lastUpdated.value) return "—";
+    const ms = timeSinceUpdate.value;
+    if (ms < 1000) return "now";
+    if (ms < 60000) return `${(ms / 1000).toFixed(0)}s ago`;
+    return `${(ms / 60000).toFixed(0)}m ago`;
+});
+
+// Lifecycle
+onMounted(() => {
+    startAutoFetch(1000); // Poll every 1 second
+
+    // Mock activity data for development
+    recentActivity.value = [
+        {
+            id: "1",
+            timestamp: Date.now(),
+            type: "request",
+            message: "GET /api/users",
+        },
+        {
+            id: "2",
+            timestamp: Date.now() - 5000,
+            type: "info",
+            message: "Proxy started on port 8080",
+        },
+        {
+            id: "3",
+            timestamp: Date.now() - 10000,
+            type: "warning",
+            message: "High memory usage detected",
+        },
+        {
+            id: "4",
+            timestamp: Date.now() - 15000,
+            type: "request",
+            message: "POST /api/config",
+        },
+        {
+            id: "5",
+            timestamp: Date.now() - 20000,
+            type: "info",
+            message: "WebSocket connection established",
+        },
+    ];
+
+    // Initialize time series data with mock data
+    const mockTimeSeriesData: TimeSeriesData = {
+        metric: "requests",
+        unit: "req/s",
+        dataPoints: Array.from({ length: 60 }, (_, i) => ({
+            timestamp: Date.now() - (60 - i) * 1000,
+            value: Math.random() * 100 + 50,
+        })),
+        current: 75,
+        min: 10,
+        max: 120,
+        avg: 65,
+        percentile_95: 110,
+        percentile_99: 115,
+    };
+
+    timeSeries.value.set("requests", mockTimeSeriesData);
+});
+
+onBeforeUnmount(() => {
+    stopAutoFetch();
+});
+
+// Methods
+const dismissError = () => {
+    clearError();
+    showErrorNotification.value = false;
+    if (errorNotificationTimeout) {
+        clearTimeout(errorNotificationTimeout);
+    }
+};
+
+const handleError = () => {
+    showErrorNotification.value = true;
+    if (errorNotificationTimeout) {
+        clearTimeout(errorNotificationTimeout);
+    }
+    // Auto-dismiss error notification after 5 seconds
+    errorNotificationTimeout = setTimeout(() => {
+        showErrorNotification.value = false;
+    }, 5000);
+};
+
+const handleRefresh = async () => {
+    await fetchMetrics();
+    console.log("✓ Metrics refreshed manually");
+};
+
+const toggleProxy = async () => {
+    isUpdating.value = true;
+    try {
+        // TODO: Call API to toggle proxy
+        // POST /api/proxy/start or POST /api/proxy/stop
+        proxyRunning.value = !proxyRunning.value;
+        console.log(`Proxy ${proxyRunning.value ? "started" : "stopped"}`);
+    } catch (err) {
+        console.error("Failed to toggle proxy:", err);
+        error.value = "Failed to toggle proxy";
+        handleError();
+    } finally {
+        isUpdating.value = false;
+    }
+};
+
+const clearTraffic = async () => {
+    isUpdating.value = true;
+    try {
+        // TODO: Call API to clear traffic
+        // DELETE /api/traffic
+        console.log("✓ Traffic cleared");
+    } catch (err) {
+        console.error("Failed to clear traffic:", err);
+        error.value = "Failed to clear traffic";
+        handleError();
+    } finally {
+        isUpdating.value = false;
+    }
+};
+
+const clearActivity = () => {
+    recentActivity.value = [];
+    console.log("✓ Activity cleared");
+};
+
+const refreshActivity = () => {
+    // TODO: Refetch activity from API (Task 2)
+    // GET /api/dashboard/activity?limit=50&offset=0
+    console.log("Refreshing activity...");
+};
+
+const handleActivityAction = (activity: {
+    id: string;
+    timestamp: number;
+    type: "request" | "error" | "warning" | "info";
+    message: string;
+    actionLabel?: string;
+    details?: string;
+}) => {
+    console.log("Activity action:", activity);
+    // TODO: Handle activity-specific actions (e.g., view request details, navigate to request detail tab)
+};
+
+const exportMetrics = async () => {
+    isUpdating.value = true;
+    try {
+        // TODO: Call API to export metrics
+        // POST /api/dashboard/export?format=json
+        console.log("✓ Metrics exported");
+    } catch (err) {
+        console.error("Failed to export metrics:", err);
+        error.value = "Failed to export metrics";
+        handleError();
+    } finally {
+        isUpdating.value = false;
+    }
+};
+
+const openSettings = () => {
+    // TODO: Open settings modal
+    console.log("Opening settings...");
+};
+</script>
 
 <style scoped>
 .dashboard-tab {
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: #0a0a0a;
+    background: #0a0a0f;
     color: #ffffff;
-    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-family: "Inter", "Roboto", "Segoe UI", sans-serif;
     overflow-y: auto;
+    gap: 20px;
+    padding-bottom: 20px;
 }
 
+.dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 0 20px;
+}
+
+/* Header */
 .dashboard-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid #1a1a1a;
-    background: linear-gradient(180deg, #0f0f0f 0%, #0a0a0a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0f 100%);
+    gap: 20px;
+}
+
+.header-left {
+    flex: 1;
 }
 
 .dashboard-title {
     margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #00d4ff;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffffff;
 }
 
-.loading-state {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 200px;
-    color: #606060;
+.subtitle {
+    font-size: 12px;
+    color: #a0a0a0;
+    margin-top: 4px;
 }
 
-.dashboard-content {
-    padding: 20px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+.header-right {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.status-indicators {
+    display: flex;
     gap: 20px;
+    flex-wrap: wrap;
 }
 
-.card {
-    background: #151515;
-    border: 1px solid #2a2a2a;
-    border-radius: 8px;
-    padding: 20px;
-}
-
-.profile-header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #2a2a2a;
-}
-
-.avatar {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    border: 2px solid #2a2a2a;
-}
-
-.user-info h3 {
-    margin: 0 0 4px 0;
-    font-size: 16px;
-}
-
-.user-id {
-    font-size: 12px;
-    color: #888;
-}
-
-.license-badge {
-    margin-left: auto;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.license-badge.pro {
-    background: rgba(0, 212, 255, 0.1);
-    color: #00d4ff;
-    border: 1px solid rgba(0, 212, 255, 0.3);
-}
-
-.license-badge.free {
-    background: rgba(255, 255, 255, 0.1);
-    color: #888;
-}
-
-.license-badge.enterprise {
-    background: rgba(255, 184, 0, 0.1);
-    color: #ffb800;
-    border: 1px solid rgba(255, 184, 0, 0.3);
-}
-
-.detail-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    font-size: 14px;
-}
-
-.label {
-    color: #888;
-}
-
-.features-list h4 {
-    margin: 0 0 8px 0;
-    font-size: 14px;
-    color: #888;
-}
-
-.features-list ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.features-list li {
-    font-size: 13px;
-    margin-bottom: 4px;
-    color: #ccc;
-}
-
-.plugins-list {
+.status-item {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 4px;
+    align-items: flex-end;
 }
 
-.plugin-item {
-    background: #0f0f0f;
-    border: 1px solid #2a2a2a;
-    border-radius: 6px;
-    padding: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.plugin-name-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.plugin-name-row h4 {
-    margin: 0;
-    font-size: 14px;
-    color: #e0e0e0;
-}
-
-.premium-tag {
+.status-label {
     font-size: 10px;
-    background: linear-gradient(90deg, #ffb800, #ff9900);
-    color: #000;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 700;
-}
-
-.plugin-info p {
-    margin: 0 0 4px 0;
-    font-size: 12px;
-    color: #888;
-}
-
-.version {
-    font-size: 11px;
+    text-transform: uppercase;
     color: #606060;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
-.btn-install {
-    background: #00d4ff;
-    color: #000;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
+.status-badge {
     font-size: 12px;
     font-weight: 600;
-    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
 }
 
-.btn-install:hover {
-    background: #33ddff;
+.status-badge.running,
+.status-badge.connected,
+.status-badge.api-live {
+    color: #00d4ff;
+    background: rgba(0, 212, 255, 0.1);
 }
 
-.btn-installed {
-    background: #2a2a2a;
-    color: #888;
+.status-badge.stopped,
+.status-badge.disconnected,
+.status-badge.api-loading {
+    color: #ffb800;
+    background: rgba(255, 184, 0, 0.1);
+}
+
+.status-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffb800;
+    font-family: "Fira Code", monospace;
+}
+
+/* Error Alert */
+.error-alert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: rgba(255, 0, 110, 0.1);
+    border-bottom: 1px solid rgba(255, 0, 110, 0.2);
+    color: #ff6b9d;
+}
+
+.error-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.error-message {
+    flex: 1;
+    font-size: 13px;
+}
+
+.close-btn {
+    background: transparent;
     border: none;
-    padding: 6px 12px;
+    color: #ff006e;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 0, 110, 0.2);
+}
+
+/* Loading State */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    gap: 16px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(0, 212, 255, 0.2);
+    border-top-color: #00d4ff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-state p {
+    color: #a0a0a0;
+    font-size: 14px;
+}
+
+/* Activity Section */
+.activity-section {
+    padding: 20px;
+    margin: 0 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(26, 26, 46, 0.5);
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.section-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    background: rgba(0, 212, 255, 0.05);
     border-radius: 4px;
     font-size: 12px;
-    cursor: default;
+}
+
+.activity-time {
+    color: #606060;
+    font-family: "Fira Code", monospace;
+    min-width: 60px;
+}
+
+.activity-type {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 10px;
+    min-width: 60px;
+}
+
+.activity-type.request {
+    background: rgba(0, 212, 255, 0.2);
+    color: #00d4ff;
+}
+
+.activity-type.error {
+    background: rgba(255, 0, 110, 0.2);
+    color: #ff006e;
+}
+
+.activity-type.warning {
+    background: rgba(255, 184, 0, 0.2);
+    color: #ffb800;
+}
+
+.activity-type.info {
+    background: rgba(139, 92, 246, 0.2);
+    color: #8b5cf6;
+}
+
+.activity-message {
+    flex: 1;
+    color: #a0a0a0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #606060;
+    font-size: 14px;
+}
+
+/* Quick Actions */
+.quick-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    flex-wrap: wrap;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 13px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-primary {
+    background: #00d4ff;
+    color: #000;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #33ddff;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    color: #00d4ff;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.6);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 1366px) {
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-right {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .status-indicators {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 1366px) {
+    .dashboard-content {
+        padding: 0 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        padding: 16px;
+    }
+
+    .dashboard-title {
+        font-size: 20px;
+    }
+
+    .status-indicators {
+        font-size: 12px;
+        gap: 12px;
+    }
+
+    .dashboard-content {
+        padding: 0 12px;
+        gap: 16px;
+    }
+
+    .quick-actions {
+        margin-left: 12px;
+        margin-right: 12px;
+    }
 }
 </style>

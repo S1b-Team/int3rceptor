@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json.schemastore.org/lighthouserc",
+  "ci": {
+    "collect": {
+      "staticDistDir": "./dist",
+      "url": [
+        "http://localhost:5173/",
+        "http://localhost:5173/#/dashboard",
+        "http://localhost:5173/#/traffic",
+        "http://localhost:5173/#/websocket",
+        "http://localhost:5173/#/repeater",
+        "http://localhost:5173/#/intruder",
+        "http://localhost:5173/#/scanner",
+        "http://localhost:5173/#/decoder",
+        "http://localhost:5173/#/comparer",
+        "http://localhost:5173/#/plugins",
+        "http://localhost:5173/#/settings"
+      ],
+      "settings": {
+        "chromeFlags": "--no-sandbox --disable-dev-shm-usage",
+        "onlyCategories": ["performance"],
+        "throttling": {
+          "rttMs": 40,
+          "throughputKbps": 10240,
+          "cpuSlowdownMultiplier": 1,
+          "requestLatencyMs": 0,
+          "downloadThroughputKbps": 0,
+          "uploadThroughputKbps": 0
+        },
+        "screenEmulation": {
+          "mobile": false,
+          "width": 1920,
+          "height": 1080,
+          "deviceScaleFactor": 1,
+          "disabled": false
+        },
+        "emulatedFormFactor": "desktop",
+        "preset": "desktop"
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.9 }],
+        "categories:accessibility": ["warn", { "minScore": 0.8 }],
+        "categories:best-practices": ["warn", { "minScore": 0.8 }],
+        "categories:seo": ["off"],
+        "first-contentful-paint": ["error", { "maxNumericValue": 1500 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["error", { "maxNumericValue": 300 }],
+        "speed-index": ["error", { "maxNumericValue": 3400 }],
+        "interactive": ["error", { "maxNumericValue": 3500 }]
+      }
+    }
+  },
+  "budgets": [
+    {
+      "path": "/*.{js,css}",
+      "timings": [
+        {
+          "metric": "total",
+          "budget": 500
+        }
+      ],
+      "resourceSizes": [
+        {
+          "resourceType": "script",
+          "budget": 300
+        },
+        {
+          "resourceType": "stylesheet",
+          "budget": 50
+        },
+        {
+          "resourceType": "total",
+          "budget": 500
+        }
+      ],
+      "resourceCounts": [
+        {
+          "resourceType": "script",
+          "budget": 10
+        },
+        {
+          "resourceType": "stylesheet",
+          "budget": 3
+        }
+      ]
+    }
+  ],
+  "performanceThresholds": {
+    "maxPageLoadTime": 3000,
+    "firstContentfulPaint": 1500,
+    "largestContentfulPaint": 2500,
+    "timeToInteractive": 3500,
+    "performanceScore": 90,
+    "cumulativeLayoutShift": 0.1,
+    "totalBlockingTime": 300,
+    "speedIndex": 3400
+  },
+  "scenarios": {
+    "coldStart": {
+      "description": "Test performance with cold cache (first visit)",
+      "settings": {
+        "disableStorageReset": false
+      }
+    },
+    "warmCache": {
+      "description": "Test performance with warm cache (subsequent visits)",
+      "settings": {
+        "disableStorageReset": true
+      }
+    }
+  }
+}
