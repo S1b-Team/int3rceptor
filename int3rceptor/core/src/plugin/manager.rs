@@ -73,14 +73,50 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Validates that the path does not contain directory traversal sequences
+    fn validate_plugin_path(&self, path: &std::path::Path) -> Result<PathBuf> {
+        // Reject paths containing parent directory references
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err(ProxyError::internal(
+                "Plugin path cannot contain parent directory references (..)",
+            ));
+        }
+
+        // Resolve the final path
+        let resolved = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            self.config.plugin_dir.join(path)
+        };
+
+        // Canonicalize to resolve any remaining path traversal issues
+        let canonical = resolved
+            .canonicalize()
+            .map_err(|_| ProxyError::internal("Failed to resolve plugin path"))?;
+
+        // Ensure the resolved path is within the plugin directory
+        let plugin_dir_canonical = self
+            .config
+            .plugin_dir
+            .canonicalize()
+            .map_err(|_| ProxyError::internal("Failed to resolve plugin directory"))?;
+
+        if !canonical.starts_with(&plugin_dir_canonical) {
+            return Err(ProxyError::internal(
+                "Plugin path must be within the plugin directory",
+            ));
+        }
+
+        Ok(canonical)
+    }
+
     /// Load a single plugin
     pub fn load_plugin(&self, config: PluginConfig) -> Result<()> {
-        // Resolve plugin path relative to plugin_dir if not absolute
-        let plugin_path = if config.path.is_absolute() {
-            config.path.clone()
-        } else {
-            self.config.plugin_dir.join(&config.path)
-        };
+        // Resolve and validate plugin path to prevent directory traversal
+        let plugin_path = self.validate_plugin_path(&config.path)?;
 
         // Check if file exists
         if !plugin_path.exists() {

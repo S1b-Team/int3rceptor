@@ -31,6 +31,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
+// Maximum allowed body size to prevent DoS attacks (10MB)
+const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+
 // ... existing handlers ...
 
 async fn upload_plugin(
@@ -229,10 +232,15 @@ async fn repeat_request(
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    let body_bytes = payload
-        .modified_body
-        .map(|b| b.into_bytes())
-        .unwrap_or(entry.request.body.clone());
+    let body_bytes = if let Some(body) = payload.modified_body {
+        let bytes = body.into_bytes();
+        if bytes.len() > MAX_BODY_SIZE {
+            return (StatusCode::PAYLOAD_TOO_LARGE, "Request body exceeds maximum size of 10MB").into_response();
+        }
+        bytes
+    } else {
+        entry.request.body.clone()
+    };
 
     let method_str = payload.method.as_deref().unwrap_or(&entry.request.method);
     let method = match method_str.parse::<Method>() {
@@ -624,9 +632,64 @@ async fn clear_dashboard_activity(Extension(state): Extension<Arc<AppState>>) ->
     StatusCode::NO_CONTENT
 }
 
+/// Validates URL to prevent SSRF attacks
+fn validate_url(url: &str) -> Result<reqwest::Url, String> {
+    let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+    
+    // Check scheme
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err("Only HTTP and HTTPS URLs are allowed".to_string());
+    }
+    
+    // Check host
+    let host = parsed.host_str().ok_or("URL must have a host")?;
+    
+    // Block private IP ranges and localhost
+    if host == "localhost" 
+        || host == "127.0.0.1"
+        || host.starts_with("10.")
+        || host.starts_with("192.168.")
+        || host.starts_with("172.")
+        || host == "[::1]"
+        || host.starts_with("[fc00:")
+        || host.starts_with("[fe80:") {
+        return Err("Access to internal addresses is not allowed".to_string());
+    }
+    
+    // Check for IP addresses in private ranges
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        let is_internal = match ip {
+            std::net::IpAddr::V4(ipv4) => {
+                ipv4.is_loopback() || ipv4.is_private() || ipv4.is_link_local() || ipv4.is_multicast()
+            }
+            std::net::IpAddr::V6(ipv6) => {
+                ipv6.is_loopback() || ipv6.is_multicast()
+            }
+        };
+        if is_internal {
+            return Err("Access to internal IP addresses is not allowed".to_string());
+        }
+    }
+    
+    Ok(parsed)
+}
+
 async fn send_manual_request(Json(payload): Json<ManualRequest>) -> impl IntoResponse {
+    // Validate URL to prevent SSRF
+    let parsed_url = match validate_url(&payload.url) {
+        Ok(url) => url,
+        Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
+    };
+
+    // Only allow invalid certs in development mode
+    let allow_invalid_certs = std::env::var("INTERCEPTOR_DEV_MODE")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
     let client = Client::builder()
-        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_certs(allow_invalid_certs)
+        .timeout(std::time::Duration::from_secs(30))
         .build()
         .unwrap_or_default();
 
@@ -637,7 +700,7 @@ async fn send_manual_request(Json(payload): Json<ManualRequest>) -> impl IntoRes
 
     let start = Instant::now();
 
-    let mut req_builder = client.request(method, &payload.url);
+    let mut req_builder = client.request(method, parsed_url);
 
     if let Some(headers) = payload.headers {
         for (k, v) in headers {

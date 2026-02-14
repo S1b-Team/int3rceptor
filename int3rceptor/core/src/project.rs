@@ -52,9 +52,23 @@ impl ProjectData {
         }
     }
 
+    /// Validates path to prevent directory traversal attacks
+    fn validate_project_path(path: &Path) -> Result<&Path> {
+        // Check for parent directory references
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err(crate::error::ProxyError::internal(
+                "Project path cannot contain parent directory references (..)",
+            ));
+        }
+        Ok(path)
+    }
+
     /// Export project to JSON file
     pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<()> {
-        let path = path.as_ref();
+        let path = Self::validate_project_path(path.as_ref())?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -65,6 +79,7 @@ impl ProjectData {
 
     /// Import project from JSON file
     pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self> {
+        let path = Self::validate_project_path(path.as_ref())?;
         let content = std::fs::read_to_string(path)?;
         let project: ProjectData = serde_json::from_str(&content)?;
         Ok(project)
