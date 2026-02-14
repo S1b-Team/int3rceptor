@@ -1,3 +1,13 @@
 {
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^20.3.4",
+    "jsdom": "^27.4.0",
+    "vitest": "^4.0.17"
+  },
+  "dependencies": {
+    "vue": "^3.5.27"
+  }
 }
