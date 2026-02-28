@@ -40,14 +40,16 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4"] }
 urlencoding = "2.1"
 # Plugin system (WASM)
-# Updated to 36.0.5+ to fix multiple security vulnerabilities
+# Updated to 36.0.6+ to fix multiple security vulnerabilities
 # - RUSTSEC-2024-0438: Windows device filename sandboxing
 # - RUSTSEC-2025-0046: fd_renumber panic
 # - RUSTSEC-2025-0118: Unsound shared memory access
 # - CVE-2025-XXXX: f64.copysign segfault on x86-64
 # - CVE-2025-XXXX: Unsound API access to shared linear memory
-wasmtime = "36.0.5"
-wasmtime-wasi = "36.0.5"
+# - GHSA: wasi:http/types.fields panic on excessive fields
+# - GHSA: WASI guest-controlled resource exhaustion DoS
+wasmtime = "36.0.6"
+wasmtime-wasi = "36.0.6"
 hex = "0.4.3"
 html-escape = "0.2.13"
 similar = "2.7.0"
