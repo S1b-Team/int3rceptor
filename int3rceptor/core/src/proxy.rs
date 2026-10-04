@@ -1,11 +1,13 @@
 use crate::capture::{CapturedRequest, CapturedResponse, RequestCapture};
 use crate::connection_pool::{ConnectionPool, ProxyBody};
 use crate::error::{ProxyError, Result};
+use crate::intercept::{HeldRequest, InterceptDecision, InterceptQueue};
 use crate::metrics::metrics;
 use crate::rules::RuleEngine;
 use crate::scanner::Scanner;
 use crate::scope::ScopeManager;
 use crate::tls::TlsInterceptor;
+use tokio::sync::oneshot;
 use http_body_util::BodyExt;
 use hyper::body::{Bytes, Incoming};
 use hyper::header::{HeaderMap, HOST};
@@ -36,6 +38,7 @@ pub struct ProxyServer {
     tls: Option<Arc<TlsInterceptor>>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
     scanner: Option<Arc<Scanner>>,
+    intercept: Arc<InterceptQueue>,
 }
 
 impl ProxyServer {
@@ -57,10 +60,21 @@ impl ProxyServer {
             tls,
             plugins,
             scanner,
+            intercept: Arc::new(InterceptQueue::new()),
         }
     }
 
+    pub fn with_intercept(mut self, intercept: Arc<InterceptQueue>) -> Self {
+        self.intercept = intercept;
+        self
+    }
+
     pub async fn run(self) -> Result<()> {
+        let (_tx, rx) = oneshot::channel();
+        self.run_until(rx).await
+    }
+
+    pub async fn run_until(self, mut shutdown: oneshot::Receiver<()>) -> Result<()> {
         info!(addr = %self.addr, "Starting proxy server");
         let listener = TcpListener::bind(self.addr).await?;
         let capture = self.capture.clone();
@@ -70,100 +84,114 @@ impl ProxyServer {
         let tls = self.tls.clone();
         let plugins = self.plugins.clone();
         let scanner = self.scanner.clone();
+        let intercept = self.intercept.clone();
 
         loop {
-            let (stream, peer) = listener.accept().await?;
-
-            // Track connection metrics
-            metrics().connection_opened();
-            debug!(peer = %peer, "Connection accepted");
-
-            let capture = capture.clone();
-            let pool = pool.clone();
-            let rules = rules.clone();
-            let scope = scope.clone();
-            let tls = tls.clone();
-            let plugins = plugins.clone();
-            let scanner = scanner.clone();
-            let peer_addr = peer;
-
-            tokio::spawn(
-                async move {
-                    let service = service_fn(move |req: Request<Incoming>| {
-                        let capture = capture.clone();
-                        let pool = pool.clone();
-                        let rules = rules.clone();
-                        let scope = scope.clone();
-                        let tls = tls.clone();
-                        let plugins = plugins.clone();
-                        let scanner = scanner.clone();
-
-                        async move {
-                            let request_id = REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
-                            let method = req.method().to_string();
-                            let uri = req.uri().to_string();
-
-                            // Create span for request tracing
-                            let span = info_span!(
-                                "request",
-                                id = request_id,
-                                method = %method,
-                                uri = %uri,
-                            );
-
-                            async {
-                                metrics().record_request();
-
-                                match handle_request(
-                                    req,
-                                    pool.clone(),
-                                    capture.clone(),
-                                    rules.clone(),
-                                    scope.clone(),
-                                    tls.clone(),
-                                    plugins.clone(),
-                                    scanner.clone(),
-                                )
-                                .await
-                                {
-                                    Ok(res) => {
-                                        metrics().record_request_success();
-                                        metrics().record_response(res.status().as_u16());
-                                        debug!(status = %res.status(), "Request completed");
-                                        Ok::<_, hyper::Error>(res)
-                                    }
-                                    Err(err) => {
-                                        metrics().record_request_error();
-                                        warn!(%err, "Proxy error");
-                                        crate::telemetry::sentry::capture_anyhow(
-                                            &anyhow::anyhow!("{}", err),
-                                            "proxy",
-                                            &[("action", "handle_request")],
-                                        );
-                                        Ok(error_response(err))
-                                    }
-                                }
-                            }
-                            .instrument(span)
-                            .await
-                        }
-                    });
-
-                    let io = TokioIo::new(stream);
-                    if let Err(err) = AutoBuilder::new(TokioExecutor::new())
-                        .serve_connection(io, service)
-                        .await
-                    {
-                        warn!(%err, peer = %peer_addr, "Connection error");
-                    }
-
-                    // Track connection close
-                    metrics().connection_closed();
-                    debug!(peer = %peer_addr, "Connection closed");
+            tokio::select! {
+                _ = &mut shutdown => {
+                    info!(addr = %self.addr, "Proxy shutdown requested");
+                    break;
                 }
-                .instrument(info_span!("connection", peer = %peer_addr)),
-            );
+                accepted = listener.accept() => {
+                    let (stream, peer) = accepted?;
+
+                    // Track connection metrics
+                    metrics().connection_opened();
+                    debug!(peer = %peer, "Connection accepted");
+
+                    let capture = capture.clone();
+                    let pool = pool.clone();
+                    let rules = rules.clone();
+                    let scope = scope.clone();
+                    let tls = tls.clone();
+                    let plugins = plugins.clone();
+                    let scanner = scanner.clone();
+                    let intercept = intercept.clone();
+                    let peer_addr = peer;
+
+                    tokio::spawn(
+                        async move {
+                            let service = service_fn(move |req: Request<Incoming>| {
+                                let capture = capture.clone();
+                                let pool = pool.clone();
+                                let rules = rules.clone();
+                                let scope = scope.clone();
+                                let tls = tls.clone();
+                                let plugins = plugins.clone();
+                                let scanner = scanner.clone();
+                                let intercept = intercept.clone();
+
+                                async move {
+                                    let request_id = REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
+                                    let method = req.method().to_string();
+                                    let uri = req.uri().to_string();
+
+                                    // Create span for request tracing
+                                    let span = info_span!(
+                                        "request",
+                                        id = request_id,
+                                        method = %method,
+                                        uri = %uri,
+                                    );
+
+                                    async {
+                                        metrics().record_request();
+
+                                        match handle_request(
+                                            req,
+                                            pool.clone(),
+                                            capture.clone(),
+                                            rules.clone(),
+                                            scope.clone(),
+                                            tls.clone(),
+                                            plugins.clone(),
+                                            scanner.clone(),
+                                            intercept.clone(),
+                                        )
+                                        .await
+                                        {
+                                            Ok(res) => {
+                                                metrics().record_request_success();
+                                                metrics().record_response(res.status().as_u16());
+                                                debug!(status = %res.status(), "Request completed");
+                                                Ok::<_, hyper::Error>(res)
+                                            }
+                                            Err(err) => {
+                                                metrics().record_request_error();
+                                                warn!(%err, "Proxy error");
+                                                crate::telemetry::sentry::capture_anyhow(
+                                                    &anyhow::anyhow!("{}", err),
+                                                    "proxy",
+                                                    &[("action", "handle_request")],
+                                                );
+                                                Ok(error_response(err))
+                                            }
+                                        }
+                                    }
+                                    .instrument(span)
+                                    .await
+                                }
+                            });
+
+                            let io = TokioIo::new(stream);
+                            if let Err(err) = AutoBuilder::new(TokioExecutor::new())
+                                .serve_connection(io, service)
+                                .await
+                            {
+                                warn!(%err, peer = %peer_addr, "Connection error");
+                            }
+
+                            // Track connection close
+                            metrics().connection_closed();
+                            debug!(peer = %peer_addr, "Connection closed");
+                        }
+                        .instrument(info_span!("connection", peer = %peer_addr)),
+                    );
+                }
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -177,12 +205,13 @@ async fn handle_request(
     tls: Option<Arc<TlsInterceptor>>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
     scanner: Option<Arc<Scanner>>,
+    intercept: Arc<InterceptQueue>,
 ) -> Result<Response<ProxyBody>> {
     if req.method() == Method::CONNECT {
-        return handle_connect(req, capture, pool, rules, scope, tls, plugins, scanner);
+        return handle_connect(req, capture, pool, rules, scope, tls, plugins, scanner, intercept);
     }
 
-    forward_request(req, pool, capture, rules, scope, plugins, scanner).await
+    forward_request(req, pool, capture, rules, scope, plugins, scanner, intercept).await
 }
 
 fn error_response(err: ProxyError) -> Response<ProxyBody> {
@@ -223,8 +252,9 @@ async fn forward_request(
     scope: Arc<ScopeManager>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
     scanner: Option<Arc<Scanner>>,
+    intercept: Arc<InterceptQueue>,
 ) -> Result<Response<ProxyBody>> {
-    let target_uri = normalize_uri(req.uri(), req.headers())?;
+    let mut target_uri = normalize_uri(req.uri(), req.headers())?;
 
     // Track host metrics
     if let Some(host) = target_uri.host() {
@@ -282,6 +312,66 @@ async fn forward_request(
         .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
         .collect();
     record.body = body_bytes.clone();
+
+    // Interactive intercept: hold in-scope traffic when the queue is enabled.
+    if intercept.is_enabled() {
+        let held = HeldRequest {
+            id: 0,
+            method: record.method.clone(),
+            url: record.url.clone(),
+            headers: record.headers.clone(),
+            body: body_bytes.clone(),
+            tls,
+            timestamp_ms: record.timestamp_ms,
+        };
+        match intercept.hold(held).await {
+            InterceptDecision::Drop => {
+                debug!(uri = %target_uri, "Request dropped by intercept queue");
+                capture.push(record, None);
+                return Ok(Response::builder()
+                    .status(StatusCode::FORBIDDEN)
+                    .body(ProxyBody::from(Bytes::from_static(b"Dropped by intercept")))
+                    .unwrap_or_else(|_| Response::new(ProxyBody::from(Bytes::new()))));
+            }
+            InterceptDecision::Edit {
+                method,
+                url,
+                headers,
+                body,
+            } => {
+                if let Some(method) = method {
+                    if let Ok(parsed) = method.parse::<Method>() {
+                        parts.method = parsed;
+                        record.method = method;
+                    }
+                }
+                if let Some(url) = url {
+                    if let Ok(parsed) = url.parse::<Uri>() {
+                        parts.uri = parsed.clone();
+                        target_uri = parsed;
+                        record.url = url;
+                    }
+                }
+                if let Some(headers) = headers {
+                    parts.headers.clear();
+                    for (name, value) in &headers {
+                        if let (Ok(n), Ok(v)) = (
+                            hyper::header::HeaderName::from_bytes(name.as_bytes()),
+                            hyper::header::HeaderValue::from_str(value),
+                        ) {
+                            parts.headers.insert(n, v);
+                        }
+                    }
+                    record.headers = headers;
+                }
+                if let Some(body) = body {
+                    body_bytes = body;
+                    record.body = body_bytes.clone();
+                }
+            }
+            InterceptDecision::Forward => {}
+        }
+    }
 
     let forward_req = Request::from_parts(parts, ProxyBody::from(Bytes::from(body_bytes.clone())));
     let client = pool.client();
@@ -354,6 +444,7 @@ fn handle_connect(
     tls: Option<Arc<TlsInterceptor>>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
     scanner: Option<Arc<Scanner>>,
+    intercept: Arc<InterceptQueue>,
 ) -> Result<Response<ProxyBody>> {
     let authority = req
         .uri()
@@ -369,9 +460,12 @@ fn handle_connect(
         let rules = rules.clone();
         let scope = scope.clone();
         let scanner = scanner.clone();
+        let intercept = intercept.clone();
         tokio::spawn(async move {
-            if let Err(err) =
-                handle_tls_connect(req, capture, pool, rules, scope, tls, plugins, scanner).await
+            if let Err(err) = handle_tls_connect(
+                req, capture, pool, rules, scope, tls, plugins, scanner, intercept,
+            )
+            .await
             {
                 warn!(%err, "tls intercept error");
             }
@@ -400,6 +494,7 @@ async fn handle_tls_connect(
     tls: Arc<TlsInterceptor>,
     plugins: Option<Arc<crate::plugin::PluginManager>>,
     scanner: Option<Arc<Scanner>>,
+    intercept: Arc<InterceptQueue>,
 ) -> Result<()> {
     let upgraded = hyper::upgrade::on(req).await?;
 
@@ -431,6 +526,7 @@ async fn handle_tls_connect(
         let tls = Some(tls.clone());
         let plugins = plugins.clone();
         let scanner = scanner.clone();
+        let intercept = intercept.clone();
         async move {
             handle_request(
                 req,
@@ -441,6 +537,7 @@ async fn handle_tls_connect(
                 tls,
                 plugins,
                 scanner,
+                intercept,
             )
             .await
         }

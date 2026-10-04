@@ -7,7 +7,9 @@ pub mod database;
 pub mod encoding;
 pub mod error;
 pub mod integration;
+pub mod intercept;
 pub mod intruder;
+pub mod proxy_control;
 pub mod license;
 pub mod metrics;
 pub mod plugin;
@@ -30,7 +32,9 @@ pub use encoding::{
     Encoder, EncodingType, TransformOperation, TransformRequest, TransformResponse,
 };
 pub use integration::{nowaru_bridge::NowaruBridge, voidwalker_bridge::VoidwalkerBridge};
+pub use intercept::{HeldRequest, InterceptDecision, InterceptQueue, InterceptStatus};
 pub use intruder::Intruder;
+pub use proxy_control::{ProxyController, ProxyStatus};
 pub use license::{License, LicenseManager, LicenseTier};
 pub use metrics::{metrics, Metrics, MetricsSnapshot};
 pub use project::{ProjectData, ProjectInfo, ProjectManager, ProjectSummary};

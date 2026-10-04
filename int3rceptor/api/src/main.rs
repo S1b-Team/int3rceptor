@@ -11,7 +11,7 @@ use interceptor_core::plugin::config::PluginSystemConfig;
 use interceptor_core::plugin::manager::PluginManager;
 use interceptor_core::rules::RuleEngine;
 use interceptor_core::storage::CaptureStorage;
-use interceptor_core::{Intruder, ProjectManager, Scanner, ScopeManager, WsCapture};
+use interceptor_core::{InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager, WsCapture};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::info;
@@ -184,6 +184,26 @@ async fn main() -> anyhow::Result<()> {
 
     let project_manager = Arc::new(ProjectManager::new(Some(storage.clone())));
 
+    let intercept = Arc::new(InterceptQueue::new());
+    let proxy_addr: SocketAddr = {
+        let guard = settings.read().await;
+        format!("{}:{}", guard.proxy.host, guard.proxy.port)
+            .parse()
+            .unwrap_or_else(|_| "127.0.0.1:8080".parse().unwrap())
+    };
+
+    let scanner = Arc::new(Scanner::new());
+    let proxy = Arc::new(ProxyController::new(
+        proxy_addr,
+        capture.clone(),
+        rules.clone(),
+        scope.clone(),
+        None, // TLS optional in API-only binary; enable via CLI for MITM
+        Some(plugin_manager.clone()),
+        Some(scanner.clone()),
+        intercept.clone(),
+    ));
+
     let state = AppState {
         capture,
         cert_manager,
@@ -191,7 +211,7 @@ async fn main() -> anyhow::Result<()> {
         rules,
         scope,
         intruder,
-        scanner: Arc::new(Scanner::new()),
+        scanner,
         ws_capture,
         project_manager,
         api_token,
@@ -203,6 +223,8 @@ async fn main() -> anyhow::Result<()> {
         settings,
         plugin_manager,
         license_manager,
+        proxy,
+        intercept,
     };
 
     let addr: SocketAddr = std::env::var("API_ADDR")

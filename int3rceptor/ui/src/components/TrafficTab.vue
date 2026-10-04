@@ -75,7 +75,7 @@ const props = defineProps<{
     apiBase?: string;
 }>();
 
-const apiBase = props.apiBase || "http://localhost:7070";
+const apiBase = props.apiBase || "http://127.0.0.1:3000";
 
 // State
 const transactions = ref<HttpTransaction[]>([]);
@@ -127,7 +127,7 @@ async function fetchTransactions() {
         if (filters.value.search) params.set("search", filters.value.search);
         params.set("limit", "500");
 
-        const url = `${apiBase}/api/traffic?${params}`;
+        const url = `${apiBase}/api/requests?${params}`;
         const res = await fetch(url);
 
         if (!res.ok) {
@@ -146,7 +146,7 @@ async function fetchTransactions() {
 // Fetch highlighted content
 async function fetchHighlighted(id: number, type: "request" | "response") {
     try {
-        const url = `${apiBase}/api/traffic/${id}/${type}/highlighted`;
+        const url = `${apiBase}/api/requests/${id}`;
         const res = await fetch(url);
 
         if (res.ok) {

@@ -57,6 +57,12 @@
             >
                 Intruder
             </button>
+            <button
+                :class="{ active: currentTab === 'intercept' }"
+                @click="currentTab = 'intercept'"
+            >
+                Intercept
+            </button>
         </nav>
 
         <template v-if="currentTab === 'traffic'">
@@ -147,6 +153,10 @@
             <IntruderTab />
         </template>
 
+        <template v-else-if="currentTab === 'intercept'">
+            <InterceptTab />
+        </template>
+
         <template v-else>
             <DashboardTab />
         </template>
@@ -162,6 +172,7 @@ import RulesTab from "./components/RulesTab.vue";
 import ScopeTab from "./components/ScopeTab.vue";
 import IntruderTab from "./components/IntruderTab.vue";
 import DashboardTab from "./components/DashboardTab.vue";
+import InterceptTab from "./components/InterceptTab.vue";
 import { useApi, api } from "./composables/useApi";
 import { useWebSocket } from "./composables/useWebSocket";
 import type { CaptureEntry } from "./types";
@@ -174,7 +185,7 @@ const selectedId = ref<number | null>(null);
 const loading = ref(false);
 const exporting = ref(false);
 const currentTab = ref<
-    "traffic" | "rules" | "scope" | "intruder" | "dashboard"
+    "traffic" | "rules" | "scope" | "intruder" | "intercept" | "dashboard"
 >("traffic");
 
 const filterMethod = ref("");

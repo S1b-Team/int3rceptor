@@ -1,7 +1,7 @@
 use interceptor_core::{
     capture::RequestCapture, cert_manager::CertManager, connection_pool::ConnectionPool,
-    plugin::manager::PluginManager, rules::RuleEngine, Intruder, ProjectManager, Scanner,
-    ScopeManager, WsCapture,
+    plugin::manager::PluginManager, rules::RuleEngine, InterceptQueue, Intruder, ProjectManager,
+    ProxyController, Scanner, ScopeManager, WsCapture,
 };
 use std::sync::Arc;
 
@@ -32,4 +32,6 @@ pub struct AppState {
     pub settings: Arc<RwLock<AppSettings>>,
     pub plugin_manager: Arc<PluginManager>,
     pub license_manager: Arc<interceptor_core::license::LicenseManager>,
+    pub proxy: Arc<ProxyController>,
+    pub intercept: Arc<InterceptQueue>,
 }

@@ -30,7 +30,7 @@ class INT3RCEPTORClient {
     // Traffic API
     async getTraffic(limit = 100) {
         try {
-            const response = await this.client.get("/traffic", {
+            const response = await this.client.get("/requests", {
                 params: { limit },
             });
             return response.data;
@@ -41,12 +41,12 @@ class INT3RCEPTORClient {
     }
 
     async getRequest(id: string) {
-        const response = await this.client.get(`/traffic/${id}`);
+        const response = await this.client.get(`/requests/${id}`);
         return response.data;
     }
 
     async clearTraffic() {
-        const response = await this.client.delete("/traffic");
+        const response = await this.client.delete("/requests");
         return response.data;
     }
 
