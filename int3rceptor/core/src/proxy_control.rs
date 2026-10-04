@@ -7,6 +7,7 @@ use crate::rules::RuleEngine;
 use crate::scanner::Scanner;
 use crate::scope::ScopeManager;
 use crate::tls::TlsInterceptor;
+use crate::websocket::WsCapture;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -55,6 +56,7 @@ struct ProxyControllerInner {
     intercept: Arc<InterceptQueue>,
     intercept_https: AtomicBool,
     certificates_generated: Arc<std::sync::atomic::AtomicU64>,
+    ws_capture: Mutex<Arc<WsCapture>>,
 }
 
 impl ProxyController {
@@ -85,8 +87,14 @@ impl ProxyController {
                 intercept,
                 intercept_https: AtomicBool::new(intercept_https),
                 certificates_generated: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+                ws_capture: Mutex::new(Arc::new(WsCapture::new(10_000))),
             }),
         }
+    }
+
+    /// Use the same WebSocket capture the HTTP API serves.
+    pub fn set_ws_capture(&self, ws_capture: Arc<WsCapture>) {
+        *self.inner.ws_capture.lock() = ws_capture;
     }
 
     pub fn intercept(&self) -> Arc<InterceptQueue> {
@@ -111,10 +119,7 @@ impl ProxyController {
             tls_enabled: self.inner.tls.is_some(),
             intercept_https: self.inner.intercept_https.load(Ordering::SeqCst),
             start_time: *self.inner.start_time.lock(),
-            certificates_generated: self
-                .inner
-                .certificates_generated
-                .load(Ordering::SeqCst),
+            certificates_generated: self.inner.certificates_generated.load(Ordering::SeqCst),
             intercept_enabled: intercept.enabled,
             held_count: intercept.held_count,
         }
@@ -128,6 +133,7 @@ impl ProxyController {
         let addr = *self.inner.addr.lock();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
+        let ws_capture = self.inner.ws_capture.lock().clone();
         let proxy = ProxyServer::new(
             addr,
             self.inner.capture.clone(),
@@ -137,7 +143,8 @@ impl ProxyController {
             self.inner.plugins.clone(),
             self.inner.scanner.clone(),
         )
-        .with_intercept(self.inner.intercept.clone());
+        .with_intercept(self.inner.intercept.clone())
+        .with_ws_capture(ws_capture);
 
         let join = tokio::spawn(async move { proxy.run_until(shutdown_rx).await });
 

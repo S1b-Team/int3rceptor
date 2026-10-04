@@ -63,6 +63,12 @@
             >
                 Intercept
             </button>
+            <button
+                :class="{ active: currentTab === 'websocket' }"
+                @click="currentTab = 'websocket'"
+            >
+                WebSocket
+            </button>
         </nav>
 
         <template v-if="currentTab === 'traffic'">
@@ -157,6 +163,10 @@
             <InterceptTab />
         </template>
 
+        <template v-else-if="currentTab === 'websocket'">
+            <WebSocketTab :api-base="api.defaults.baseURL ?? 'http://127.0.0.1:3000'" />
+        </template>
+
         <template v-else>
             <DashboardTab />
         </template>
@@ -173,6 +183,7 @@ import ScopeTab from "./components/ScopeTab.vue";
 import IntruderTab from "./components/IntruderTab.vue";
 import DashboardTab from "./components/DashboardTab.vue";
 import InterceptTab from "./components/InterceptTab.vue";
+import WebSocketTab from "./components/WebSocketTab.vue";
 import { useApi, api } from "./composables/useApi";
 import { useWebSocket } from "./composables/useWebSocket";
 import type { CaptureEntry } from "./types";
@@ -185,7 +196,13 @@ const selectedId = ref<number | null>(null);
 const loading = ref(false);
 const exporting = ref(false);
 const currentTab = ref<
-    "traffic" | "rules" | "scope" | "intruder" | "intercept" | "dashboard"
+    | "traffic"
+    | "rules"
+    | "scope"
+    | "intruder"
+    | "intercept"
+    | "websocket"
+    | "dashboard"
 >("traffic");
 
 const filterMethod = ref("");

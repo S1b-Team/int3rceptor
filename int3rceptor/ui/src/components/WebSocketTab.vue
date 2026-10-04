@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * WebSocketTab.vue - VOIDWALKER WebSocket Analysis Component
+ * WebSocketTab.vue
  *
- * Displays WebSocket connections and frames with real-time updates.
+ * Lists WebSocket connections and frames from the proxy capture API.
  */
 
 import { ref, computed, onMounted, onUnmounted } from "vue";
@@ -10,18 +10,11 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 // Types for VOIDWALKER WebSocket data
 interface ConnectionSummary {
     id: string;
-    http_request_id: number;
     url: string;
-    host: string;
-    protocol?: string;
     state: string;
-    frames_sent: number;
-    frames_received: number;
-    bytes_sent: number;
-    bytes_received: number;
+    frames_count: number;
     started_at: string;
     ended_at?: string;
-    secure: boolean;
 }
 
 interface WebSocketFrame {
@@ -61,7 +54,7 @@ const props = defineProps<{
     apiBase?: string;
 }>();
 
-const apiBase = props.apiBase || "http://localhost:7071";
+const apiBase = props.apiBase || "http://127.0.0.1:3000";
 
 // State
 const connections = ref<ConnectionSummary[]>([]);
@@ -99,13 +92,33 @@ const stateColors: Record<string, string> = {
 };
 
 // Fetch connections
+function mapConnection(raw: {
+    id: string;
+    url: string;
+    established_at: number;
+    closed_at: number | null;
+    frames_count: number;
+}): ConnectionSummary {
+    return {
+        id: raw.id,
+        url: raw.url,
+        state: raw.closed_at ? "closed" : "open",
+        frames_count: raw.frames_count ?? 0,
+        started_at: new Date(raw.established_at * 1000).toISOString(),
+        ended_at: raw.closed_at
+            ? new Date(raw.closed_at * 1000).toISOString()
+            : undefined,
+    };
+}
+
 async function fetchConnections() {
     loading.value = true;
     try {
         const url = `${apiBase}/api/websocket/connections`;
         const res = await fetch(url);
         if (res.ok) {
-            connections.value = await res.json();
+            const data = await res.json();
+            connections.value = Array.isArray(data) ? data.map(mapConnection) : [];
         }
     } catch (e) {
         console.error("Failed to fetch connections:", e);
@@ -115,12 +128,43 @@ async function fetchConnections() {
 }
 
 // Fetch frames for a connection
+function mapFrame(raw: {
+    id: number;
+    connection_id: string;
+    timestamp: number;
+    direction: string;
+    frame_type: string;
+    payload: number[];
+    masked: boolean;
+}): WebSocketFrame {
+    const payload = raw.payload ?? [];
+    const frameType = String(raw.frame_type || "").toLowerCase();
+    let text: string | undefined;
+    if (frameType === "text") {
+        text = new TextDecoder().decode(new Uint8Array(payload));
+    }
+    return {
+        id: raw.id,
+        connection_id: raw.connection_id,
+        direction: raw.direction === "ClientToServer" ? "sent" : "received",
+        frame_type: frameType,
+        payload,
+        text,
+        length: payload.length,
+        masked: raw.masked,
+        fin: true,
+        compressed: false,
+        timestamp: new Date(raw.timestamp * 1000).toISOString(),
+    };
+}
+
 async function fetchFrames(connectionId: string) {
     try {
-        const url = `${apiBase}/api/websocket/connections/${connectionId}/frames`;
+        const url = `${apiBase}/api/websocket/frames/${encodeURIComponent(connectionId)}`;
         const res = await fetch(url);
         if (res.ok) {
-            frames.value = await res.json();
+            const data = await res.json();
+            frames.value = Array.isArray(data) ? data.map(mapFrame) : [];
         }
     } catch (e) {
         console.error("Failed to fetch frames:", e);
@@ -156,16 +200,22 @@ function selectFrame(frame: WebSocketFrame) {
 // Compare two frames
 async function compareTwoFrames() {
     if (!selectedFrame.value || !compareFrame.value) return;
-
-    try {
-        const url = `${apiBase}/api/websocket/frames/compare?a=${selectedFrame.value.id}&b=${compareFrame.value.id}`;
-        const res = await fetch(url);
-        if (res.ok) {
-            diffResult.value = await res.json();
-        }
-    } catch (e) {
-        console.error("Failed to compare frames:", e);
-    }
+    const a = selectedFrame.value.text ?? "";
+    const b = compareFrame.value.text ?? "";
+    const same = a === b;
+    diffResult.value = {
+        frame_a_id: selectedFrame.value.id,
+        frame_b_id: compareFrame.value.id,
+        changes: same
+            ? [{ change_type: "equal", content: a }]
+            : [
+                  { change_type: "delete", content: a },
+                  { change_type: "insert", content: b },
+              ],
+        insertions: same ? 0 : 1,
+        deletions: same ? 0 : 1,
+        similarity: same ? 1 : 0,
+    };
 }
 
 // Enable compare mode
@@ -192,13 +242,6 @@ function formatTime(timestamp: string): string {
         second: "2-digit",
         fractionalSecondDigits: 3,
     });
-}
-
-// Format bytes
-function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // Get direction icon
@@ -263,41 +306,22 @@ function escapeHtml(text: string): string {
         .replace(/>/g, "&gt;");
 }
 
-// WebSocket for real-time updates
-let ws: WebSocket | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-function connectWebSocket() {
-    const wsUrl = apiBase.replace("http", "ws") + "/ws/events";
-    ws = new WebSocket(wsUrl);
-
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (
-            data.type === "connection_opened" ||
-            data.type === "connection_closed"
-        ) {
-            fetchConnections();
-        } else if (
-            data.type === "frame_captured" &&
-            selectedConnection.value?.id === data.connection_id
-        ) {
-            fetchFrames(selectedConnection.value.id);
-        }
-    };
-
-    ws.onclose = () => {
-        setTimeout(connectWebSocket, 5000);
-    };
-}
-
-// Lifecycle
 onMounted(() => {
     fetchConnections();
-    connectWebSocket();
+    pollTimer = setInterval(() => {
+        fetchConnections();
+        if (selectedConnection.value) {
+            fetchFrames(selectedConnection.value.id);
+        }
+    }, 2000);
 });
 
 onUnmounted(() => {
-    ws?.close();
+    if (pollTimer) {
+        clearInterval(pollTimer);
+    }
 });
 </script>
 
@@ -351,15 +375,7 @@ onUnmounted(() => {
                         <div class="conn-url">{{ conn.url }}</div>
 
                         <div class="conn-stats">
-                            <span class="sent">↑ {{ conn.frames_sent }}</span>
-                            <span class="received"
-                                >↓ {{ conn.frames_received }}</span
-                            >
-                            <span class="bytes">{{
-                                formatBytes(
-                                    conn.bytes_sent + conn.bytes_received
-                                )
-                            }}</span>
+                            <span class="sent">{{ conn.frames_count }} frames</span>
                         </div>
                     </div>
 

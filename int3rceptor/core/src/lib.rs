@@ -23,6 +23,7 @@ pub mod storage;
 pub mod telemetry;
 pub mod tls;
 pub mod websocket;
+pub mod ws_proxy;
 
 pub use capture::{ActivityQuery, CaptureQuery, DashboardActivity, RequestCapture};
 pub use cert_manager::CertManager;
