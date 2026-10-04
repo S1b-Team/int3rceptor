@@ -11,7 +11,9 @@ use interceptor_core::plugin::config::PluginSystemConfig;
 use interceptor_core::plugin::manager::PluginManager;
 use interceptor_core::rules::RuleEngine;
 use interceptor_core::storage::CaptureStorage;
-use interceptor_core::{InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager, WsCapture};
+use interceptor_core::{
+    InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager, WsCapture,
+};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::info;
@@ -203,6 +205,7 @@ async fn main() -> anyhow::Result<()> {
         Some(scanner.clone()),
         intercept.clone(),
     ));
+    proxy.set_ws_capture(ws_capture.clone());
 
     let state = AppState {
         capture,

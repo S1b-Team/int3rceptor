@@ -19,12 +19,12 @@ use interceptor_api::models::{AppSettings, ProxyConfig, UiConfig};
 use interceptor_core::connection_pool::ConnectionPool;
 use interceptor_core::plugin::config::PluginSystemConfig;
 use interceptor_core::plugin::manager::PluginManager;
-use interceptor_core::{InterceptQueue, ProxyController};
 use interceptor_core::tls::TlsInterceptor;
 use interceptor_core::{
     capture::RequestCapture, cert_manager::CertManager, rules::RuleEngine, storage::CaptureStorage,
     Intruder, ProjectManager, Scanner, ScopeManager, WsCapture,
 };
+use interceptor_core::{InterceptQueue, ProxyController};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -206,6 +206,7 @@ async fn main() -> anyhow::Result<()> {
         Some(scanner.clone()),
         intercept.clone(),
     ));
+    proxy_controller.set_ws_capture(ws_capture.clone());
 
     // Start proxy immediately (CLI default); API can still stop/start it.
     proxy_controller
