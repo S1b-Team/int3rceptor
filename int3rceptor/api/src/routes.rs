@@ -1134,6 +1134,7 @@ mod proxy_route_tests {
     };
     use std::net::SocketAddr;
     use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::sync::RwLock;
     use tower::util::ServiceExt;
 
@@ -1235,5 +1236,137 @@ mod proxy_route_tests {
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
         let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(body["enabled"], true);
+    }
+
+    /// CLI starts the proxy with the same capture the API serves. A request
+    /// through that listener must show up on GET /api/requests (Traffic tab).
+    #[tokio::test]
+    async fn cli_proxy_request_shows_up_on_traffic_list() {
+        interceptor_core::connection_pool::install_crypto_provider();
+
+        let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("upstream bind");
+        let upstream_addr = upstream.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut sock, _) = upstream.accept().await.expect("upstream accept");
+            let mut buf = Vec::new();
+            let mut tmp = [0u8; 1024];
+            loop {
+                let n = sock.read(&mut tmp).await.expect("upstream read");
+                if n == 0 {
+                    return;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+                if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let body = b"ok";
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            sock.write_all(response.as_bytes()).await.expect("upstream write");
+            sock.write_all(body).await.expect("upstream body");
+        });
+
+        let reserved = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("proxy bind");
+        let proxy_addr = reserved.local_addr().unwrap();
+        drop(reserved);
+
+        let state = test_state().await;
+        state.proxy.set_addr(proxy_addr);
+        state.proxy.start().await.expect("proxy start");
+
+        let api_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("api bind");
+        let api_addr = api_listener.local_addr().unwrap();
+        let app = crate::build_router(state.clone());
+        tokio::spawn(async move {
+            axum::serve(
+                api_listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
+            .expect("api serve");
+        });
+
+        let mut client = None;
+        for _ in 0..50 {
+            match tokio::net::TcpStream::connect(proxy_addr).await {
+                Ok(sock) => {
+                    client = Some(sock);
+                    break;
+                }
+                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(20)).await,
+            }
+        }
+        let mut client = client.expect("proxy did not accept");
+        let marker = format!("/smoke-cli-traffic-{}", proxy_addr.port());
+        let request = format!(
+            "GET http://{upstream_addr}{marker} HTTP/1.1\r\nHost: {upstream_addr}\r\nConnection: close\r\n\r\n"
+        );
+        client
+            .write_all(request.as_bytes())
+            .await
+            .expect("proxy write");
+        let mut proxied = Vec::new();
+        let mut tmp = [0u8; 1024];
+        loop {
+            let n = tokio::time::timeout(std::time::Duration::from_secs(3), client.read(&mut tmp))
+                .await
+                .expect("proxy response timeout")
+                .expect("proxy read");
+            if n == 0 {
+                break;
+            }
+            proxied.extend_from_slice(&tmp[..n]);
+            if proxied.windows(2).any(|w| w == b"ok") {
+                break;
+            }
+        }
+        let proxied = String::from_utf8_lossy(&proxied);
+        assert!(
+            proxied.contains("200"),
+            "proxy did not return the upstream response: {proxied}"
+        );
+
+        let mut listed = String::new();
+        for _ in 0..25 {
+            let mut api = match tokio::net::TcpStream::connect(api_addr).await {
+                Ok(sock) => sock,
+                Err(_) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                    continue;
+                }
+            };
+            let http = format!(
+                "GET /api/requests HTTP/1.1\r\nHost: {api_addr}\r\nConnection: close\r\n\r\n"
+            );
+            api.write_all(http.as_bytes()).await.expect("api write");
+            listed.clear();
+            let mut tmp = [0u8; 2048];
+            loop {
+                match tokio::time::timeout(std::time::Duration::from_secs(2), api.read(&mut tmp)).await {
+                    Ok(Ok(0)) | Err(_) => break,
+                    Ok(Ok(n)) => listed.push_str(&String::from_utf8_lossy(&tmp[..n])),
+                    Ok(Err(_)) => break,
+                }
+            }
+            if listed.contains(&marker) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(
+            listed.contains(&marker),
+            "GET /api/requests did not include traffic captured by the proxy: {listed}"
+        );
+
+        state.proxy.stop().await.expect("proxy stop");
     }
 }
