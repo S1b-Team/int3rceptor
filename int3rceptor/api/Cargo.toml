@@ -40,3 +40,6 @@ rcgen = { version = "0.12", optional = true }
 
 [dev-dependencies]
 tempfile = "3.8"
+rcgen.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true

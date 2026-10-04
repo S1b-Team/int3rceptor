@@ -1,4 +1,5 @@
 use crate::capture::RequestCapture;
+use crate::connection_pool::ConnectionPool;
 use crate::error::Result;
 use crate::intercept::InterceptQueue;
 use crate::plugin::PluginManager;
@@ -47,6 +48,7 @@ struct ProxyControllerInner {
     addr: Mutex<SocketAddr>,
     start_time: Mutex<i64>,
     runtime: Mutex<Option<ProxyRuntime>>,
+    pool: Mutex<Option<ConnectionPool>>,
     capture: Arc<RequestCapture>,
     rules: Arc<RuleEngine>,
     scope: Arc<ScopeManager>,
@@ -78,6 +80,7 @@ impl ProxyController {
                 addr: Mutex::new(addr),
                 start_time: Mutex::new(0),
                 runtime: Mutex::new(None),
+                pool: Mutex::new(None),
                 capture,
                 rules,
                 scope,
@@ -95,6 +98,11 @@ impl ProxyController {
     /// Use the same WebSocket capture the HTTP API serves.
     pub fn set_ws_capture(&self, ws_capture: Arc<WsCapture>) {
         *self.inner.ws_capture.lock() = ws_capture;
+    }
+
+    /// Replace the upstream client used the next time the listener starts.
+    pub fn set_connection_pool(&self, pool: ConnectionPool) {
+        *self.inner.pool.lock() = Some(pool);
     }
 
     pub fn intercept(&self) -> Arc<InterceptQueue> {
@@ -145,6 +153,12 @@ impl ProxyController {
         )
         .with_intercept(self.inner.intercept.clone())
         .with_ws_capture(ws_capture);
+
+        let proxy = if let Some(pool) = self.inner.pool.lock().clone() {
+            proxy.with_pool(pool)
+        } else {
+            proxy
+        };
 
         let join = tokio::spawn(async move { proxy.run_until(shutdown_rx).await });
 
