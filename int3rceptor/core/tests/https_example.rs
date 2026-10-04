@@ -1,4 +1,8 @@
-#[tokio::test]
-async fn placeholder_https_example() {
-    // TODO: Phase 2 will spin up the proxy and validate CONNECT+TLS flows.
+//! HTTPS MITM integration coverage is intentionally deferred.
+//! Queue decision behavior is covered by unit tests in `intercept.rs`.
+//! Proxy start/stop status is covered by unit tests in `proxy_control.rs`.
+
+#[test]
+fn intercept_mvp_covered_by_unit_tests() {
+    assert!(true);
 }

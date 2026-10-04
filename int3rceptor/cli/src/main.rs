@@ -19,7 +19,7 @@ use interceptor_api::models::{AppSettings, ProxyConfig, UiConfig};
 use interceptor_core::connection_pool::ConnectionPool;
 use interceptor_core::plugin::config::PluginSystemConfig;
 use interceptor_core::plugin::manager::PluginManager;
-use interceptor_core::proxy::ProxyServer;
+use interceptor_core::{InterceptQueue, ProxyController};
 use interceptor_core::tls::TlsInterceptor;
 use interceptor_core::{
     capture::RequestCapture, cert_manager::CertManager, rules::RuleEngine, storage::CaptureStorage,
@@ -195,6 +195,24 @@ async fn main() -> anyhow::Result<()> {
     }
     let license_manager = Arc::new(license_manager);
 
+    let intercept = Arc::new(InterceptQueue::new());
+    let proxy_controller = Arc::new(ProxyController::new(
+        cli.listen,
+        capture.clone(),
+        rules.clone(),
+        scope.clone(),
+        Some(tls.clone()),
+        Some(plugin_manager.clone()),
+        Some(scanner.clone()),
+        intercept.clone(),
+    ));
+
+    // Start proxy immediately (CLI default); API can still stop/start it.
+    proxy_controller
+        .start()
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
+
     let api_state = interceptor_api::state::AppState {
         capture: capture.clone(),
         cert_manager: cert_manager.clone(),
@@ -214,24 +232,11 @@ async fn main() -> anyhow::Result<()> {
         settings,
         plugin_manager: plugin_manager.clone(),
         license_manager,
+        proxy: proxy_controller,
+        intercept,
     };
     let api_addr = cli.api;
-    let api_task = tokio::spawn(async move { interceptor_api::serve(api_state, api_addr).await });
-
-    let proxy = ProxyServer::new(
-        cli.listen,
-        capture.clone(),
-        rules.clone(),
-        scope.clone(),
-        Some(tls),
-        Some(plugin_manager),
-        Some(scanner),
-    );
-    let proxy_task = tokio::spawn(async move { proxy.run().await });
-
-    let (api_res, proxy_res) = tokio::try_join!(api_task, proxy_task)?;
-    api_res?;
-    proxy_res?;
+    interceptor_api::serve(api_state, api_addr).await?;
 
     info!("Shutdown complete");
     Ok(())

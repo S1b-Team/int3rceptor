@@ -8,6 +8,11 @@ use std::sync::Arc;
 pub type ProxyBody = Full<Bytes>;
 pub type HttpClient = Client<hyper_rustls::HttpsConnector<HttpConnector>, ProxyBody>;
 
+/// Install a process-wide rustls CryptoProvider when none is selected yet.
+pub fn install_crypto_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 #[derive(Clone)]
 pub struct ConnectionPool {
     client: Arc<HttpClient>,
@@ -21,6 +26,7 @@ impl Default for ConnectionPool {
 
 impl ConnectionPool {
     pub fn new() -> Self {
+        install_crypto_provider();
         let mut connector = HttpConnector::new();
         connector.enforce_http(false);
         let https = HttpsConnectorBuilder::new()

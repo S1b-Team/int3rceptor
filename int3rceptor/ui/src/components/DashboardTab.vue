@@ -117,6 +117,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { useProxyControl } from "@/composables/useProxyControl";
 import { useDashboardMetrics } from "@/composables/dashboard/useDashboardMetrics";
 import MetricsGrid from "./dashboard/MetricsGrid.vue";
 import SystemHealthPanel from "./dashboard/SystemHealthPanel.vue";
@@ -146,7 +147,6 @@ const {
 
 // State
 const wsConnected = ref(false);
-const proxyRunning = ref(true);
 const isUpdating = ref(false);
 const showErrorNotification = ref(false);
 let errorNotificationTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -184,7 +184,56 @@ const formatLastUpdate = computed(() => {
 });
 
 // Lifecycle
+const {
+    isProxyRunning,
+    startProxy,
+    stopProxy,
+    clearTraffic: clearTrafficApi,
+    getProxyStatus,
+} = useProxyControl((message, type) => {
+    if (type === "error") {
+        error.value = message;
+        handleError();
+    } else {
+        console.log("[proxy] " + type + ": " + message);
+    }
+});
+
+const proxyRunning = isProxyRunning;
+
+const toggleProxy = async () => {
+    isUpdating.value = true;
+    try {
+        if (proxyRunning.value) {
+            await stopProxy();
+        } else {
+            await startProxy();
+        }
+    } catch (err) {
+        console.error("Failed to toggle proxy:", err);
+        error.value = "Failed to toggle proxy";
+        handleError();
+    } finally {
+        isUpdating.value = false;
+    }
+};
+
+const clearTraffic = async () => {
+    isUpdating.value = true;
+    try {
+        await clearTrafficApi();
+        console.log("Traffic cleared");
+    } catch (err) {
+        console.error("Failed to clear traffic:", err);
+        error.value = "Failed to clear traffic";
+        handleError();
+    } finally {
+        isUpdating.value = false;
+    }
+};
+
 onMounted(() => {
+    getProxyStatus();
     startAutoFetch(1000); // Poll every 1 second
 
     // Mock activity data for development
@@ -269,36 +318,7 @@ const handleRefresh = async () => {
     console.log("✓ Metrics refreshed manually");
 };
 
-const toggleProxy = async () => {
-    isUpdating.value = true;
-    try {
-        // TODO: Call API to toggle proxy
-        // POST /api/proxy/start or POST /api/proxy/stop
-        proxyRunning.value = !proxyRunning.value;
-        console.log(`Proxy ${proxyRunning.value ? "started" : "stopped"}`);
-    } catch (err) {
-        console.error("Failed to toggle proxy:", err);
-        error.value = "Failed to toggle proxy";
-        handleError();
-    } finally {
-        isUpdating.value = false;
-    }
-};
 
-const clearTraffic = async () => {
-    isUpdating.value = true;
-    try {
-        // TODO: Call API to clear traffic
-        // DELETE /api/traffic
-        console.log("✓ Traffic cleared");
-    } catch (err) {
-        console.error("Failed to clear traffic:", err);
-        error.value = "Failed to clear traffic";
-        handleError();
-    } finally {
-        isUpdating.value = false;
-    }
-};
 
 const clearActivity = () => {
     recentActivity.value = [];

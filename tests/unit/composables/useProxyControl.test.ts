@@ -204,7 +204,7 @@ describe('useProxyControl', () => {
 
       await clearTraffic();
 
-      expect(mockDelete).toHaveBeenCalledWith('/api/traffic');
+      expect(mockDelete).toHaveBeenCalledWith('/api/requests');
     });
 
     it('should handle clear error', async () => {
@@ -214,7 +214,7 @@ describe('useProxyControl', () => {
 
       await clearTraffic();
 
-      expect(mockDelete).toHaveBeenCalledWith('/api/traffic');
+      expect(mockDelete).toHaveBeenCalledWith('/api/requests');
     });
 
     it('should not allow multiple simultaneous clears', async () => {

@@ -168,6 +168,8 @@ export interface ProxyStatus {
     intercept_https: boolean;
     start_time: number;
     certificates_generated: number;
+    intercept_enabled?: boolean;
+    held_count?: number;
 }
 
 /**

@@ -180,6 +180,15 @@ pub fn router() -> Router {
         )
         // License routes
         .route("/api/license", get(get_license))
+        // Proxy control
+        .route("/api/proxy/status", get(proxy_status))
+        .route("/api/proxy/start", post(proxy_start))
+        .route("/api/proxy/stop", post(proxy_stop))
+        // Interactive intercept queue
+        .route("/api/intercept", get(list_intercept).put(set_intercept_enabled))
+        .route("/api/intercept/:id/forward", post(intercept_forward))
+        .route("/api/intercept/:id/drop", post(intercept_drop))
+        .route("/api/intercept/:id/edit", post(intercept_edit))
 }
 
 async fn get_license(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
@@ -470,8 +479,9 @@ fn build_export_response(entries: Vec<CaptureEntry>, format: ExportFormat) -> im
 }
 
 async fn clear_requests(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    let cleared_count = state.capture.len();
     state.capture.clear();
-    StatusCode::NO_CONTENT
+    Json(json!({ "cleared_count": cleared_count }))
 }
 
 async fn download_ca_cert(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
@@ -965,4 +975,265 @@ async fn project_new(
     state.scanner.clear_findings();
 
     StatusCode::OK
+}
+
+
+// ============= PROXY CONTROL =============
+
+async fn proxy_status(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.proxy.status())
+}
+
+async fn proxy_start(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    // Keep listen address in sync with settings.
+    let settings = state.settings.read().await;
+    let addr = format!("{}:{}", settings.proxy.host, settings.proxy.port);
+    drop(settings);
+    if let Ok(parsed) = addr.parse() {
+        state.proxy.set_addr(parsed);
+    }
+
+    match state.proxy.start().await {
+        Ok(status) => Json(status).into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": err })),
+        )
+            .into_response(),
+    }
+}
+
+async fn proxy_stop(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    match state.proxy.stop().await {
+        Ok(status) => Json(status).into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": err })),
+        )
+            .into_response(),
+    }
+}
+
+// ============= INTERCEPT QUEUE =============
+
+#[derive(Deserialize)]
+struct InterceptEnableRequest {
+    enabled: bool,
+}
+
+#[derive(Deserialize)]
+struct InterceptEditRequest {
+    method: Option<String>,
+    url: Option<String>,
+    headers: Option<Vec<(String, String)>>,
+    /// Raw body text (UTF-8). Prefer this for UI edits.
+    body: Option<String>,
+    /// Optional base64 body; used when body is omitted.
+    body_base64: Option<String>,
+}
+
+fn held_to_json(held: &interceptor_core::HeldRequest) -> serde_json::Value {
+    let body_text = String::from_utf8(held.body.clone()).ok();
+    json!({
+        "id": held.id,
+        "method": held.method,
+        "url": held.url,
+        "headers": held.headers,
+        "body_base64": BASE64.encode(&held.body),
+        "body_text": body_text,
+        "tls": held.tls,
+        "timestamp_ms": held.timestamp_ms,
+    })
+}
+
+async fn list_intercept(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    let status = state.intercept.status();
+    let items: Vec<_> = state.intercept.list().iter().map(held_to_json).collect();
+    Json(json!({
+        "enabled": status.enabled,
+        "held_count": status.held_count,
+        "items": items,
+    }))
+}
+
+async fn set_intercept_enabled(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(payload): Json<InterceptEnableRequest>,
+) -> impl IntoResponse {
+    state.intercept.set_enabled(payload.enabled);
+    let status = state.intercept.status();
+    Json(json!({
+        "enabled": status.enabled,
+        "held_count": status.held_count,
+    }))
+}
+
+async fn intercept_forward(
+    Path(id): Path<u64>,
+    Extension(state): Extension<Arc<AppState>>,
+) -> impl IntoResponse {
+    if state.intercept.forward(id) {
+        Json(json!({ "id": id, "action": "forward" })).into_response()
+    } else {
+        StatusCode::NOT_FOUND.into_response()
+    }
+}
+
+async fn intercept_drop(
+    Path(id): Path<u64>,
+    Extension(state): Extension<Arc<AppState>>,
+) -> impl IntoResponse {
+    if state.intercept.drop_request(id) {
+        Json(json!({ "id": id, "action": "drop" })).into_response()
+    } else {
+        StatusCode::NOT_FOUND.into_response()
+    }
+}
+
+async fn intercept_edit(
+    Path(id): Path<u64>,
+    Extension(state): Extension<Arc<AppState>>,
+    Json(payload): Json<InterceptEditRequest>,
+) -> impl IntoResponse {
+    let body = if let Some(text) = payload.body {
+        Some(text.into_bytes())
+    } else if let Some(b64) = payload.body_base64 {
+        match BASE64.decode(b64.as_bytes()) {
+            Ok(bytes) => Some(bytes),
+            Err(_) => {
+                return (StatusCode::BAD_REQUEST, Json(json!({ "error": "invalid body_base64" })))
+                    .into_response();
+            }
+        }
+    } else {
+        None
+    };
+
+    if state
+        .intercept
+        .edit(id, payload.method, payload.url, payload.headers, body)
+    {
+        Json(json!({ "id": id, "action": "edit" })).into_response()
+    } else {
+        StatusCode::NOT_FOUND.into_response()
+    }
+}
+
+#[cfg(test)]
+mod proxy_route_tests {
+    use super::*;
+    use crate::ip_filter::IpFilter;
+    use crate::models::{AppSettings, ProxyConfig, UiConfig};
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use http_body_util::BodyExt;
+    use interceptor_core::{
+        capture::RequestCapture, cert_manager::CertManager, connection_pool::ConnectionPool,
+        plugin::config::PluginSystemConfig, plugin::manager::PluginManager, rules::RuleEngine,
+        InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager, WsCapture,
+    };
+    use std::net::SocketAddr;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+    use tower::util::ServiceExt;
+
+    async fn test_state() -> Arc<AppState> {
+        interceptor_core::connection_pool::install_crypto_provider();
+        let capture = Arc::new(RequestCapture::new(100));
+        let rules = Arc::new(RuleEngine::new());
+        let scope = Arc::new(ScopeManager::new());
+        let intercept = Arc::new(InterceptQueue::new());
+        let scanner = Arc::new(Scanner::new());
+        let plugin_manager = Arc::new(PluginManager::new(PluginSystemConfig::default()));
+        let proxy = Arc::new(ProxyController::new(
+            "127.0.0.1:0".parse::<SocketAddr>().unwrap(),
+            capture.clone(),
+            rules.clone(),
+            scope.clone(),
+            None,
+            Some(plugin_manager.clone()),
+            Some(scanner.clone()),
+            intercept.clone(),
+        ));
+        let cert_manager = Arc::new(CertManager::new().expect("cert manager"));
+        let mut license_manager = interceptor_core::license::LicenseManager::new();
+        let _ = license_manager.load_license();
+
+        Arc::new(AppState {
+            capture,
+            cert_manager,
+            pool: ConnectionPool::new(),
+            rules,
+            scope,
+            intruder: Arc::new(Intruder::new()),
+            scanner,
+            ws_capture: Arc::new(WsCapture::new(100)),
+            project_manager: Arc::new(ProjectManager::new(None)),
+            api_token: None,
+            max_body_bytes: 1024 * 1024,
+            max_concurrency: 8,
+            audit_logger: None,
+            csrf_protection: None,
+            ip_filter: Arc::new(IpFilter::new(crate::ip_filter::IpFilterConfig::default())),
+            settings: Arc::new(RwLock::new(AppSettings {
+                proxy: ProxyConfig {
+                    port: 8080,
+                    host: "127.0.0.1".into(),
+                    intercept_https: false,
+                    http2: false,
+                },
+                ui: UiConfig {
+                    theme: "cyberpunk".into(),
+                    animations: false,
+                    notifications: false,
+                },
+            })),
+            plugin_manager,
+            license_manager: Arc::new(license_manager),
+            proxy,
+            intercept,
+        })
+    }
+
+    #[tokio::test]
+    async fn proxy_status_reports_stopped() {
+        let state = test_state().await;
+        let app = router().layer(Extension(state));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/proxy/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["running"], false);
+        assert!(body.get("port").is_some());
+        assert!(body.get("intercept_enabled").is_some());
+    }
+
+    #[tokio::test]
+    async fn intercept_enable_and_list() {
+        let state = test_state().await;
+        let app = router().layer(Extension(state));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/api/intercept")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"enabled":true}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["enabled"], true);
+    }
 }

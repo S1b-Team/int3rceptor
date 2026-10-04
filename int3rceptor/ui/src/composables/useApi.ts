@@ -111,6 +111,40 @@ export function useApi() {
         await api.post("/api/intruder/stop");
     };
 
+
+    const listIntercept = async () => {
+        const { data } = await api.get("/api/intercept");
+        return data;
+    };
+
+    const setInterceptEnabled = async (enabled: boolean) => {
+        const { data } = await api.put("/api/intercept", { enabled });
+        return data;
+    };
+
+    const forwardIntercept = async (id: number) => {
+        const { data } = await api.post(`/api/intercept/${id}/forward`);
+        return data;
+    };
+
+    const dropIntercept = async (id: number) => {
+        const { data } = await api.post(`/api/intercept/${id}/drop`);
+        return data;
+    };
+
+    const editIntercept = async (
+        id: number,
+        payload: {
+            method?: string;
+            url?: string;
+            headers?: [string, string][];
+            body?: string;
+        }
+    ) => {
+        const { data } = await api.post(`/api/intercept/${id}/edit`, payload);
+        return data;
+    };
+
     return {
         listRequests,
         clearRequests,
@@ -126,6 +160,11 @@ export function useApi() {
         intruderClear,
         intruderStart,
         intruderStop,
+        listIntercept,
+        setInterceptEnabled,
+        forwardIntercept,
+        dropIntercept,
+        editIntercept,
     };
 }
 

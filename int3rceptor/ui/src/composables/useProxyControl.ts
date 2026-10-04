@@ -4,7 +4,7 @@
  * Manages proxy server control operations (start, stop, clear traffic, export).
  * - POST /api/proxy/start - Start the proxy server
  * - POST /api/proxy/stop - Stop the proxy server
- * - DELETE /api/traffic - Clear captured traffic
+ * - DELETE /api/requests - Clear captured traffic
  * - POST /api/dashboard/export - Export metrics in various formats
  *
  * @example
@@ -291,7 +291,7 @@ export function useProxyControl(onNotify?: NotificationCallback): UseProxyContro
     /**
      * Clear all captured traffic from the proxy
      *
-     * Sends DELETE /api/traffic request
+     * Sends DELETE /api/requests request
      * Shows notification with count of cleared requests
      *
      * @throws Will not throw; errors are handled with notifications
@@ -306,7 +306,7 @@ export function useProxyControl(onNotify?: NotificationCallback): UseProxyContro
         lastOperation.value = "clear_traffic";
 
         try {
-            const response = await api.delete<{ cleared_count: number }>("/api/traffic");
+            const response = await api.delete<{ cleared_count: number }>("/api/requests");
 
             if (response.data) {
                 const count = response.data.cleared_count;
