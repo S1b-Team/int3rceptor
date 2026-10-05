@@ -1369,4 +1369,255 @@ mod proxy_route_tests {
 
         state.proxy.stop().await.expect("proxy stop");
     }
+
+    /// HTTPS through the listener must be decrypted, not stored as only a CONNECT tunnel.
+    #[tokio::test]
+    async fn https_request_shows_inner_url_on_traffic_list() {
+        interceptor_core::connection_pool::install_crypto_provider();
+
+        let (origin_ca, origin_cert, origin_key) = test_origin_material();
+        let mut server_config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(vec![origin_cert], origin_key)
+            .expect("origin cert");
+        server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(server_config));
+        let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("upstream bind");
+        let upstream_addr = upstream.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (sock, _) = upstream.accept().await.expect("upstream accept");
+            let mut tls = acceptor.accept(sock).await.expect("origin tls");
+            let mut buf = Vec::new();
+            let mut tmp = [0u8; 1024];
+            loop {
+                let n = tls.read(&mut tmp).await.expect("origin read");
+                if n == 0 {
+                    return;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+                if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let body = b"https-ok";
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            tls.write_all(response.as_bytes())
+                .await
+                .expect("origin write");
+            tls.write_all(body).await.expect("origin body");
+        });
+
+        let reserved = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("proxy bind");
+        let proxy_addr = reserved.local_addr().unwrap();
+        drop(reserved);
+
+        let base = test_state().await;
+        let disk_ca = std::fs::read_to_string(base.cert_manager.ca_directory().join("ca_cert.pem"))
+            .expect("existing interceptor CA");
+        let interceptor_pem = base.cert_manager.ca_pem().expect("ca pem");
+        assert_eq!(
+            interceptor_pem, disk_ca,
+            "runtime CA diverged from ~/.interceptor/ca"
+        );
+
+        let tls = Arc::new(
+            interceptor_core::tls::TlsInterceptor::new(base.cert_manager.clone()).expect("mitm"),
+        );
+        let mut state = (*base).clone();
+        let proxy = Arc::new(ProxyController::new(
+            proxy_addr,
+            state.capture.clone(),
+            state.rules.clone(),
+            state.scope.clone(),
+            Some(tls),
+            Some(state.plugin_manager.clone()),
+            Some(state.scanner.clone()),
+            state.intercept.clone(),
+        ));
+        proxy.set_connection_pool(ConnectionPool::trusting_extra(vec![origin_ca]));
+        state.proxy = proxy;
+        let state = Arc::new(state);
+        state.proxy.start().await.expect("proxy start");
+
+        let api_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("api bind");
+        let api_addr = api_listener.local_addr().unwrap();
+        let app = crate::build_router(state.clone());
+        tokio::spawn(async move {
+            axum::serve(
+                api_listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
+            .expect("api serve");
+        });
+
+        let mut client = None;
+        for _ in 0..50 {
+            match tokio::net::TcpStream::connect(proxy_addr).await {
+                Ok(sock) => {
+                    client = Some(sock);
+                    break;
+                }
+                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(20)).await,
+            }
+        }
+        let mut client = client.expect("proxy did not accept");
+        let connect = format!("CONNECT {upstream_addr} HTTP/1.1\r\nHost: {upstream_addr}\r\n\r\n");
+        client
+            .write_all(connect.as_bytes())
+            .await
+            .expect("connect write");
+        let mut preface = Vec::new();
+        let mut tmp = [0u8; 256];
+        loop {
+            let n = tokio::time::timeout(std::time::Duration::from_secs(3), client.read(&mut tmp))
+                .await
+                .expect("connect timeout")
+                .expect("connect read");
+            assert!(n > 0, "proxy closed before CONNECT response");
+            preface.extend_from_slice(&tmp[..n]);
+            if preface.windows(4).any(|w| w == b"\r\n\r\n") {
+                break;
+            }
+        }
+        let preface_text = String::from_utf8_lossy(&preface);
+        assert!(
+            preface_text.contains("200"),
+            "CONNECT was not accepted: {preface_text}"
+        );
+
+        let mut roots = rustls::RootCertStore::empty();
+        roots
+            .add(pem_certificate(&interceptor_pem))
+            .expect("interceptor CA");
+        let mut client_config = rustls::ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        client_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        let connector = tokio_rustls::TlsConnector::from(Arc::new(client_config));
+        let server_name = rustls::pki_types::ServerName::try_from("127.0.0.1")
+            .expect("ip server name")
+            .to_owned();
+        let mut tls_stream = connector
+            .connect(server_name, client)
+            .await
+            .expect("mitm handshake");
+        let inner = format!(
+            "GET /inner-https HTTP/1.1\r\nHost: {upstream_addr}\r\nConnection: close\r\n\r\n"
+        );
+        tls_stream
+            .write_all(inner.as_bytes())
+            .await
+            .expect("inner write");
+        let mut proxied = Vec::new();
+        let mut tmp = [0u8; 1024];
+        loop {
+            let n =
+                tokio::time::timeout(std::time::Duration::from_secs(5), tls_stream.read(&mut tmp))
+                    .await
+                    .expect("inner response timeout")
+                    .expect("inner read");
+            if n == 0 {
+                break;
+            }
+            proxied.extend_from_slice(&tmp[..n]);
+            if proxied.windows(8).any(|w| w == b"https-ok") {
+                break;
+            }
+        }
+        let proxied = String::from_utf8_lossy(&proxied);
+        assert!(
+            proxied.contains("200"),
+            "decrypted request was not forwarded: {proxied}"
+        );
+
+        let marker = format!("https://{upstream_addr}/inner-https");
+        let mut listed = String::new();
+        for _ in 0..25 {
+            let mut api = match tokio::net::TcpStream::connect(api_addr).await {
+                Ok(sock) => sock,
+                Err(_) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                    continue;
+                }
+            };
+            let http = format!(
+                "GET /api/requests HTTP/1.1\r\nHost: {api_addr}\r\nConnection: close\r\n\r\n"
+            );
+            api.write_all(http.as_bytes()).await.expect("api write");
+            listed.clear();
+            let mut tmp = [0u8; 4096];
+            loop {
+                match tokio::time::timeout(std::time::Duration::from_secs(2), api.read(&mut tmp))
+                    .await
+                {
+                    Ok(Ok(0)) | Err(_) => break,
+                    Ok(Ok(n)) => listed.push_str(&String::from_utf8_lossy(&tmp[..n])),
+                    Ok(Err(_)) => break,
+                }
+            }
+            if listed.contains(&marker) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(
+            listed.contains(&marker),
+            "GET /api/requests did not include the decrypted URL {marker}: {listed}"
+        );
+
+        state.proxy.stop().await.expect("proxy stop");
+    }
+
+    fn pem_certificate(pem: &str) -> rustls::pki_types::CertificateDer<'static> {
+        let b64: String = pem.lines().filter(|line| !line.starts_with('-')).collect();
+        rustls::pki_types::CertificateDer::from(BASE64.decode(b64.trim()).expect("pem base64"))
+    }
+
+    fn test_origin_material() -> (
+        rustls::pki_types::CertificateDer<'static>,
+        rustls::pki_types::CertificateDer<'static>,
+        rustls::pki_types::PrivateKeyDer<'static>,
+    ) {
+        use rcgen::{
+            BasicConstraints, CertificateParams, DnType, IsCa, Issuer, KeyPair, KeyUsagePurpose,
+        };
+        use time::{Duration, OffsetDateTime};
+
+        let mut ca_params = CertificateParams::new(vec!["Test Origin CA".to_string()]).unwrap();
+        ca_params
+            .distinguished_name
+            .push(DnType::CommonName, "Test Origin CA");
+        ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        ca_params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
+        ca_params.not_before = OffsetDateTime::now_utc() - Duration::days(1);
+        ca_params.not_after = OffsetDateTime::now_utc() + Duration::days(2);
+        let ca_key = KeyPair::generate().unwrap();
+        let ca_cert = ca_params.self_signed(&ca_key).unwrap();
+        let issuer = Issuer::from_ca_cert_pem(&ca_cert.pem(), &ca_key).unwrap();
+
+        let mut leaf = CertificateParams::new(vec!["127.0.0.1".to_string()]).unwrap();
+        leaf.distinguished_name
+            .push(DnType::CommonName, "127.0.0.1");
+        leaf.not_before = ca_params.not_before;
+        leaf.not_after = ca_params.not_after;
+        let leaf_key = KeyPair::generate().unwrap();
+        let leaf_cert = leaf.signed_by(&leaf_key, &issuer).unwrap();
+
+        let ca_der = pem_certificate(&ca_cert.pem());
+        let leaf_der = rustls::pki_types::CertificateDer::from(leaf_cert.der().to_vec());
+        let key = rustls::pki_types::PrivateKeyDer::Pkcs8(
+            rustls::pki_types::PrivatePkcs8KeyDer::from(leaf_key.serialize_der()),
+        );
+        (ca_der, leaf_der, key)
+    }
 }

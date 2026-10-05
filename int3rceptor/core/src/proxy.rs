@@ -80,6 +80,11 @@ impl ProxyServer {
         self
     }
 
+    pub fn with_pool(mut self, pool: ConnectionPool) -> Self {
+        self.pool = pool;
+        self
+    }
+
     pub async fn run(self) -> Result<()> {
         let (_tx, rx) = oneshot::channel();
         self.run_until(rx).await
@@ -260,6 +265,34 @@ fn host_from_headers(headers: &HeaderMap) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+fn host_from_authority(authority: &str) -> String {
+    if let Some(rest) = authority.strip_prefix('[') {
+        return rest.split(']').next().unwrap_or(authority).to_string();
+    }
+    match authority.rsplit_once(':') {
+        Some((host, port)) if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) => {
+            host.to_string()
+        }
+        _ => authority.to_string(),
+    }
+}
+
+/// Decrypted CONNECT traffic is plain HTTP on the inside, but the origin is HTTPS.
+fn mark_intercepted_https(uri: Uri, upstream_tls: bool) -> Result<Uri> {
+    if !upstream_tls || uri.scheme_str() == Some("https") {
+        return Ok(uri);
+    }
+    let auth = uri
+        .authority()
+        .map(|value| value.to_string())
+        .ok_or_else(|| ProxyError::InvalidRequest("missing host".into()))?;
+    let path = uri
+        .path_and_query()
+        .map(|value| value.as_str().to_string())
+        .unwrap_or_else(|| "/".to_string());
+    Ok(format!("https://{auth}{path}").parse()?)
+}
+
 fn normalize_uri(uri: &Uri, headers: &HeaderMap) -> Result<Uri> {
     if uri.scheme().is_some() && uri.authority().is_some() {
         return Ok(uri.clone());
@@ -304,7 +337,8 @@ async fn forward_request(
         .await;
     }
 
-    let mut target_uri = normalize_uri(req.uri(), req.headers())?;
+    let mut target_uri =
+        mark_intercepted_https(normalize_uri(req.uri(), req.headers())?, upstream_tls)?;
 
     // Track host metrics
     if let Some(host) = target_uri.host() {
@@ -515,7 +549,8 @@ fn handle_connect(
         let ws_capture = ws_capture.clone();
         tokio::spawn(async move {
             if let Err(err) = handle_tls_connect(
-                req, capture, pool, rules, scope, tls, plugins, scanner, intercept, ws_capture,
+                req, authority, capture, pool, rules, scope, tls, plugins, scanner, intercept,
+                ws_capture,
             )
             .await
             {
@@ -539,6 +574,7 @@ fn handle_connect(
 #[allow(clippy::too_many_arguments)]
 async fn handle_tls_connect(
     req: Request<Incoming>,
+    authority: String,
     capture: Arc<RequestCapture>,
     pool: ConnectionPool,
     rules: Arc<RuleEngine>,
@@ -552,7 +588,8 @@ async fn handle_tls_connect(
     let upgraded = hyper::upgrade::on(req).await?;
 
     // Track TLS handshake
-    let stream = match tls.acceptor.accept(TokioIo::new(upgraded)).await {
+    let host = host_from_authority(&authority);
+    let stream = match tls.acceptor_for(&host).accept(TokioIo::new(upgraded)).await {
         Ok(s) => {
             metrics().record_tls_handshake();
             debug!("TLS handshake completed");
@@ -637,18 +674,8 @@ async fn forward_websocket(
     upstream_tls: bool,
 ) -> Result<Response<ProxyBody>> {
     let client_upgrade = hyper::upgrade::on(&mut req);
-    let mut target_uri = normalize_uri(req.uri(), req.headers())?;
-    if upstream_tls && target_uri.scheme_str() != Some("https") {
-        let auth = target_uri
-            .authority()
-            .map(|a| a.to_string())
-            .unwrap_or_default();
-        let path = target_uri
-            .path_and_query()
-            .map(|p| p.as_str().to_string())
-            .unwrap_or_else(|| "/".to_string());
-        target_uri = format!("https://{auth}{path}").parse()?;
-    }
+    let mut target_uri =
+        mark_intercepted_https(normalize_uri(req.uri(), req.headers())?, upstream_tls)?;
 
     if let Some(host) = target_uri.host() {
         metrics().record_host_request(host);

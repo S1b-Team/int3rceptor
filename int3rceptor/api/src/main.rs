@@ -11,6 +11,7 @@ use interceptor_core::plugin::config::PluginSystemConfig;
 use interceptor_core::plugin::manager::PluginManager;
 use interceptor_core::rules::RuleEngine;
 use interceptor_core::storage::CaptureStorage;
+use interceptor_core::tls::TlsInterceptor;
 use interceptor_core::{
     InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager, WsCapture,
 };
@@ -38,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
     let capture = Arc::new(RequestCapture::with_storage(10_000, Some(storage.clone())));
 
     let cert_manager = Arc::new(CertManager::new()?);
+    let tls = Arc::new(TlsInterceptor::new(cert_manager.clone())?);
     let rules = Arc::new(RuleEngine::new());
     info!("Initialized RuleEngine");
 
@@ -200,7 +202,7 @@ async fn main() -> anyhow::Result<()> {
         capture.clone(),
         rules.clone(),
         scope.clone(),
-        None, // TLS optional in API-only binary; enable via CLI for MITM
+        Some(tls),
         Some(plugin_manager.clone()),
         Some(scanner.clone()),
         intercept.clone(),
