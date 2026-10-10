@@ -157,7 +157,10 @@ pub fn router() -> Router {
         .route("/api/metrics/reset", post(reset_metrics))
         .route("/api/health", get(health_check))
         .route("/api/dashboard/activity", get(get_dashboard_activity))
-        .route("/api/dashboard/activity/clear", delete(clear_dashboard_activity))
+        .route(
+            "/api/dashboard/activity/clear",
+            delete(clear_dashboard_activity),
+        )
         // Security management routes
         .route(
             "/api/security/ip-filter",
@@ -187,7 +190,10 @@ pub fn router() -> Router {
         .route("/api/proxy/start", post(proxy_start))
         .route("/api/proxy/stop", post(proxy_stop))
         // Interactive intercept queue
-        .route("/api/intercept", get(list_intercept).put(set_intercept_enabled))
+        .route(
+            "/api/intercept",
+            get(list_intercept).put(set_intercept_enabled),
+        )
         .route("/api/intercept/:id/forward", post(intercept_forward))
         .route("/api/intercept/:id/drop", post(intercept_drop))
         .route("/api/intercept/:id/edit", post(intercept_edit))
@@ -246,7 +252,11 @@ async fn repeat_request(
     let body_bytes = if let Some(body) = payload.modified_body {
         let bytes = body.into_bytes();
         if bytes.len() > MAX_BODY_SIZE {
-            return (StatusCode::PAYLOAD_TOO_LARGE, "Request body exceeds maximum size of 10MB").into_response();
+            return (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Request body exceeds maximum size of 10MB",
+            )
+                .into_response();
         }
         bytes
     } else {
@@ -656,43 +666,45 @@ async fn clear_dashboard_activity(Extension(state): Extension<Arc<AppState>>) ->
 /// Validates URL to prevent SSRF attacks
 fn validate_url(url: &str) -> Result<reqwest::Url, String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
-    
+
     // Check scheme
     let scheme = parsed.scheme();
     if scheme != "http" && scheme != "https" {
         return Err("Only HTTP and HTTPS URLs are allowed".to_string());
     }
-    
+
     // Check host
     let host = parsed.host_str().ok_or("URL must have a host")?;
-    
+
     // Block private IP ranges and localhost
-    if host == "localhost" 
+    if host == "localhost"
         || host == "127.0.0.1"
         || host.starts_with("10.")
         || host.starts_with("192.168.")
         || host.starts_with("172.")
         || host == "[::1]"
         || host.starts_with("[fc00:")
-        || host.starts_with("[fe80:") {
+        || host.starts_with("[fe80:")
+    {
         return Err("Access to internal addresses is not allowed".to_string());
     }
-    
+
     // Check for IP addresses in private ranges
     if let Ok(ip) = host.parse::<std::net::IpAddr>() {
         let is_internal = match ip {
             std::net::IpAddr::V4(ipv4) => {
-                ipv4.is_loopback() || ipv4.is_private() || ipv4.is_link_local() || ipv4.is_multicast()
+                ipv4.is_loopback()
+                    || ipv4.is_private()
+                    || ipv4.is_link_local()
+                    || ipv4.is_multicast()
             }
-            std::net::IpAddr::V6(ipv6) => {
-                ipv6.is_loopback() || ipv6.is_multicast()
-            }
+            std::net::IpAddr::V6(ipv6) => ipv6.is_loopback() || ipv6.is_multicast(),
         };
         if is_internal {
             return Err("Access to internal IP addresses is not allowed".to_string());
         }
     }
-    
+
     Ok(parsed)
 }
 
@@ -988,7 +1000,6 @@ async fn project_new(
     StatusCode::OK
 }
 
-
 // ============= PROXY CONTROL =============
 
 async fn proxy_status(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
@@ -1112,7 +1123,10 @@ async fn intercept_edit(
         match BASE64.decode(b64.as_bytes()) {
             Ok(bytes) => Some(bytes),
             Err(_) => {
-                return (StatusCode::BAD_REQUEST, Json(json!({ "error": "invalid body_base64" })))
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid body_base64" })),
+                )
                     .into_response();
             }
         }
@@ -1141,7 +1155,8 @@ mod proxy_route_tests {
     use interceptor_core::{
         capture::RequestCapture, cert_manager::CertManager, connection_pool::ConnectionPool,
         plugin::config::PluginSystemConfig, plugin::manager::PluginManager, rules::RuleEngine,
-        InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager, WsCapture,
+        InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager,
+        WsCapture,
     };
     use std::net::SocketAddr;
     use std::sync::Arc;
@@ -1278,7 +1293,9 @@ mod proxy_route_tests {
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 body.len()
             );
-            sock.write_all(response.as_bytes()).await.expect("upstream write");
+            sock.write_all(response.as_bytes())
+                .await
+                .expect("upstream write");
             sock.write_all(body).await.expect("upstream body");
         });
 
@@ -1362,7 +1379,9 @@ mod proxy_route_tests {
             listed.clear();
             let mut tmp = [0u8; 2048];
             loop {
-                match tokio::time::timeout(std::time::Duration::from_secs(2), api.read(&mut tmp)).await {
+                match tokio::time::timeout(std::time::Duration::from_secs(2), api.read(&mut tmp))
+                    .await
+                {
                     Ok(Ok(0)) | Err(_) => break,
                     Ok(Ok(n)) => listed.push_str(&String::from_utf8_lossy(&tmp[..n])),
                     Ok(Err(_)) => break,
@@ -1633,23 +1652,29 @@ mod proxy_route_tests {
     }
 
     /// An attack started over the API must surface its results over the API:
-    /// POST /api/intruder/start, poll GET /api/intruder/status, then the rows
-    /// show up on GET /api/intruder/results. Fails if results never propagate.
+    /// POST /api/intruder/start, observe running while upstream is held open,
+    /// then release and confirm final rows on GET /api/intruder/results.
     #[tokio::test]
     async fn intruder_attack_results_come_back_over_api() {
         interceptor_core::connection_pool::install_crypto_provider();
 
-        // Upstream that answers 200 to every probe the attack sends.
+        // Gate: upstream holds each response open until the test releases it,
+        // so status can be observed while the attack is still in flight.
+        let (release_tx, release_rx) = tokio::sync::watch::channel(false);
+        let arrived = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("upstream bind");
         let upstream_addr = upstream.local_addr().unwrap();
+        let arrived_up = arrived.clone();
         tokio::spawn(async move {
             loop {
                 let (mut sock, _) = match upstream.accept().await {
                     Ok(pair) => pair,
                     Err(_) => return,
                 };
+                let mut release_rx = release_rx.clone();
+                let arrived = arrived_up.clone();
                 tokio::spawn(async move {
                     let mut buf = Vec::new();
                     let mut tmp = [0u8; 1024];
@@ -1661,6 +1686,12 @@ mod proxy_route_tests {
                         buf.extend_from_slice(&tmp[..n]);
                         if buf.windows(4).any(|w| w == b"\r\n\r\n") {
                             break;
+                        }
+                    }
+                    arrived.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    while !*release_rx.borrow() {
+                        if release_rx.changed().await.is_err() {
+                            return;
                         }
                     }
                     let body = b"ok";
@@ -1711,6 +1742,27 @@ mod proxy_route_tests {
             start.contains("200 OK"),
             "intruder start was rejected: {start}"
         );
+
+        // Wait until at least one probe has reached the held-open upstream.
+        let mut saw_arrival = false;
+        for _ in 0..50 {
+            if arrived.load(std::sync::atomic::Ordering::SeqCst) > 0 {
+                saw_arrival = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(saw_arrival, "upstream never saw an in-flight probe");
+
+        // While upstream is still holding responses, status must report running.
+        let mid = get_path(api_addr, "/api/intruder/status").await;
+        assert!(
+            mid.contains("\"running\":true"),
+            "status did not report running while attack was in flight: {mid}"
+        );
+
+        // Release upstream so in-flight requests can finish.
+        release_tx.send(true).expect("release send");
 
         // Poll GET /api/intruder/status until the attack drains (2 payloads).
         let mut drained = false;

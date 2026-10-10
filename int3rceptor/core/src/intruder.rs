@@ -66,7 +66,10 @@ pub struct IntruderStatus {
 
 pub struct Intruder {
     results: Arc<RwLock<Vec<IntruderResult>>>,
+    /// True from start until in-flight requests finish (includes drain after stop).
     is_running: Arc<AtomicBool>,
+    /// Cleared by stop; launch loop checks this so status can stay running while draining.
+    launch_requests: Arc<AtomicBool>,
 }
 
 impl Intruder {
@@ -74,6 +77,7 @@ impl Intruder {
         Self {
             results: Arc::new(RwLock::new(Vec::new())),
             is_running: Arc::new(AtomicBool::new(false)),
+            launch_requests: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -87,10 +91,12 @@ impl Intruder {
             return Err(anyhow::anyhow!("Attack already running"));
         }
 
+        self.launch_requests.store(true, Ordering::SeqCst);
         self.clear_results();
         let requests = self.generate_requests(&template, &config)?;
         let results = self.results.clone();
         let is_running = self.is_running.clone();
+        let launch_requests = self.launch_requests.clone();
         let concurrency = config.options.concurrency.max(1);
         let delay = config.options.delay_ms;
 
@@ -99,7 +105,7 @@ impl Intruder {
             let mut handles = Vec::new();
 
             for (id, (req_str, payload)) in requests.into_iter().enumerate() {
-                if !is_running.load(Ordering::SeqCst) {
+                if !launch_requests.load(Ordering::SeqCst) {
                     break;
                 }
 
@@ -155,6 +161,7 @@ impl Intruder {
                 let _ = handle.await;
             }
 
+            launch_requests.store(false, Ordering::SeqCst);
             is_running.store(false, Ordering::SeqCst);
         });
 
@@ -162,7 +169,8 @@ impl Intruder {
     }
 
     pub fn stop_attack(&self) {
-        self.is_running.store(false, Ordering::SeqCst);
+        // Stop launching new requests; keep is_running true until in-flight work drains.
+        self.launch_requests.store(false, Ordering::SeqCst);
     }
 
     pub fn is_running(&self) -> bool {
@@ -170,6 +178,7 @@ impl Intruder {
     }
 
     /// Current attack state plus the number of results collected so far.
+    /// `running` stays true while in-flight requests are still draining after stop.
     pub fn status(&self) -> IntruderStatus {
         IntruderStatus {
             running: self.is_running(),
