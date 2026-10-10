@@ -165,7 +165,11 @@ impl Intruder {
                     let outcome = tokio::time::timeout(timeout, async {
                         let resp = client.request(req).await.ok()?;
                         let status = resp.status().as_u16();
-                        let body_len = resp.collect().await.ok()?.to_bytes().len();
+                        // Keep the status even if the body stream ends early.
+                        let body_len = match resp.collect().await {
+                            Ok(bytes) => bytes.to_bytes().len(),
+                            Err(_) => 0,
+                        };
                         Some((status, body_len))
                     })
                     .await;
@@ -646,12 +650,126 @@ mod tests {
         assert_eq!(after.result_count, 1);
     }
 
-    /// A hung upstream must not leave the attack stuck after stop: status
-    /// drains, then a fresh start is accepted.
+    /// A hung upstream must not leave the attack stuck after stop: wait until
+    /// a probe is in flight, stop, then confirm running clears well before the
+    /// request timeout (abort path), and that a fresh start is accepted.
     #[tokio::test]
     async fn stop_clears_running_when_upstream_hangs() {
         use crate::connection_pool::{install_crypto_provider, ConnectionPool};
+        use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
         use tokio::io::AsyncReadExt;
+
+        install_crypto_provider();
+
+        let arrived = Arc::new(AtomicUsize::new(0));
+        let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("upstream bind");
+        let upstream_addr = upstream.local_addr().unwrap();
+        let arrived_up = arrived.clone();
+        tokio::spawn(async move {
+            loop {
+                let (mut sock, _) = match upstream.accept().await {
+                    Ok(pair) => pair,
+                    Err(_) => return,
+                };
+                let arrived = arrived_up.clone();
+                tokio::spawn(async move {
+                    let mut buf = Vec::new();
+                    let mut tmp = [0u8; 1024];
+                    loop {
+                        let n = match sock.read(&mut tmp).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => n,
+                        };
+                        buf.extend_from_slice(&tmp[..n]);
+                        if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                            break;
+                        }
+                    }
+                    // Probe is waiting on this hung response; stop must abort it.
+                    arrived.fetch_add(1, AtomicOrdering::SeqCst);
+                    std::future::pending::<()>().await;
+                });
+            }
+        });
+
+        let intruder = Intruder::new();
+        let pool = ConnectionPool::new();
+        let template = format!(
+            "GET http://{upstream_addr}/probe-\u{00a7}p\u{00a7} HTTP/1.1\r\nHost: {upstream_addr}\r\nConnection: close\r\n\r\n"
+        );
+        const TIMEOUT_MS: u64 = 10_000;
+        let config = IntruderConfig {
+            positions: vec![IntruderPosition {
+                start: 0,
+                end: 0,
+                name: "p".to_string(),
+            }],
+            payloads: vec!["one".to_string(), "two".to_string()],
+            attack_type: AttackType::Sniper,
+            options: IntruderOptions {
+                concurrency: 2,
+                delay_ms: 0,
+                // Long enough that abort-on-stop is what clears running, not the timer.
+                timeout_ms: TIMEOUT_MS,
+            },
+        };
+
+        intruder
+            .start_attack(template.clone(), config.clone(), pool.clone())
+            .await
+            .expect("first start");
+
+        // Wait until upstream has accepted at least one in-flight probe.
+        let mut saw_probe = false;
+        for _ in 0..50 {
+            if arrived.load(AtomicOrdering::SeqCst) > 0 {
+                saw_probe = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(saw_probe, "upstream never received an in-flight probe");
+        assert!(
+            intruder.is_running(),
+            "attack should still be running with a hung probe"
+        );
+
+        let stop_started = Instant::now();
+        intruder.stop_attack();
+
+        let mut drained = false;
+        for _ in 0..50 {
+            if !intruder.is_running() {
+                drained = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        let elapsed_ms = stop_started.elapsed().as_millis() as u64;
+        assert!(
+            drained,
+            "stop left the attack running while upstream was hung"
+        );
+        assert!(
+            elapsed_ms < TIMEOUT_MS / 2,
+            "running cleared after {elapsed_ms}ms; abort should beat the {TIMEOUT_MS}ms timeout"
+        );
+
+        intruder
+            .start_attack(template, config, pool)
+            .await
+            .expect("start after stop must succeed");
+        assert!(intruder.is_running());
+        intruder.stop_attack();
+    }
+
+    /// Headers without a complete body should still record the HTTP status.
+    #[tokio::test]
+    async fn truncated_body_still_records_status() {
+        use crate::connection_pool::{install_crypto_provider, ConnectionPool};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
         install_crypto_provider();
 
@@ -660,18 +778,24 @@ mod tests {
             .expect("upstream bind");
         let upstream_addr = upstream.local_addr().unwrap();
         tokio::spawn(async move {
+            let (mut sock, _) = upstream.accept().await.expect("accept");
+            let mut buf = Vec::new();
+            let mut tmp = [0u8; 1024];
             loop {
-                let (mut sock, _) = match upstream.accept().await {
-                    Ok(pair) => pair,
-                    Err(_) => return,
+                let n = match sock.read(&mut tmp).await {
+                    Ok(0) | Err(_) => return,
+                    Ok(n) => n,
                 };
-                tokio::spawn(async move {
-                    let mut buf = [0u8; 1024];
-                    let _ = sock.read(&mut buf).await;
-                    // Never respond: request()/collect() would hang without timeout/abort.
-                    std::future::pending::<()>().await;
-                });
+                buf.extend_from_slice(&tmp[..n]);
+                if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                    break;
+                }
             }
+            // Promise a body, then close before sending it.
+            let _ = sock
+                .write_all(b"HTTP/1.1 203 Non-Authoritative Information\r\nContent-Length: 64\r\nConnection: close\r\n\r\n")
+                .await;
+            // Drop sock without writing the body.
         });
 
         let intruder = Intruder::new();
@@ -685,51 +809,34 @@ mod tests {
                 end: 0,
                 name: "p".to_string(),
             }],
-            payloads: vec!["one".to_string(), "two".to_string()],
+            payloads: vec!["only".to_string()],
             attack_type: AttackType::Sniper,
             options: IntruderOptions {
-                concurrency: 2,
+                concurrency: 1,
                 delay_ms: 0,
-                // Long enough that abort-on-stop is what clears running, not the timer.
-                timeout_ms: 10_000,
+                timeout_ms: 5_000,
             },
         };
 
         intruder
-            .start_attack(template.clone(), config.clone(), pool.clone())
+            .start_attack(template, config, pool)
             .await
-            .expect("first start");
+            .expect("start");
 
-        let mut saw_running = false;
+        let mut done = false;
         for _ in 0..50 {
-            if intruder.is_running() {
-                saw_running = true;
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        }
-        assert!(saw_running, "attack never reported running");
-
-        intruder.stop_attack();
-
-        let mut drained = false;
-        for _ in 0..50 {
-            if !intruder.is_running() {
-                drained = true;
+            let status = intruder.status();
+            if !status.running && status.result_count == 1 {
+                done = true;
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(40)).await;
         }
-        assert!(
-            drained,
-            "stop left the attack running while upstream was hung"
-        );
+        assert!(done, "attack did not finish with one result");
 
-        intruder
-            .start_attack(template, config, pool)
-            .await
-            .expect("start after stop must succeed");
-        assert!(intruder.is_running());
-        intruder.stop_attack();
+        let results = intruder.get_results();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status_code, 203);
+        assert_eq!(results[0].response_length, 0);
     }
 }
