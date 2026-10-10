@@ -126,6 +126,8 @@ pub fn router() -> Router {
         )
         .route("/api/intruder/start", post(intruder_start))
         .route("/api/intruder/stop", post(intruder_stop))
+        .route("/api/intruder/status", get(intruder_status))
+        .route("/api/intruder/payloads", get(intruder_payloads))
         // Scanner routes
         .route(
             "/api/scanner/config",
@@ -580,6 +582,15 @@ async fn intruder_start(
 async fn intruder_stop(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
     state.intruder.stop_attack();
     StatusCode::OK
+}
+
+async fn intruder_status(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.intruder.status())
+}
+
+/// Built-in list of plain fuzzing payloads a client can load as a starting set.
+async fn intruder_payloads() -> impl IntoResponse {
+    Json(json!({ "payloads": interceptor_core::intruder::common_payloads() }))
 }
 
 #[derive(Deserialize)]
@@ -1619,5 +1630,144 @@ mod proxy_route_tests {
             rustls::pki_types::PrivatePkcs8KeyDer::from(leaf_key.serialize_der()),
         );
         (ca_der, leaf_der, key)
+    }
+
+    /// An attack started over the API must surface its results over the API:
+    /// POST /api/intruder/start, poll GET /api/intruder/status, then the rows
+    /// show up on GET /api/intruder/results. Fails if results never propagate.
+    #[tokio::test]
+    async fn intruder_attack_results_come_back_over_api() {
+        interceptor_core::connection_pool::install_crypto_provider();
+
+        // Upstream that answers 200 to every probe the attack sends.
+        let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("upstream bind");
+        let upstream_addr = upstream.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut sock, _) = match upstream.accept().await {
+                    Ok(pair) => pair,
+                    Err(_) => return,
+                };
+                tokio::spawn(async move {
+                    let mut buf = Vec::new();
+                    let mut tmp = [0u8; 1024];
+                    loop {
+                        let n = match sock.read(&mut tmp).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => n,
+                        };
+                        buf.extend_from_slice(&tmp[..n]);
+                        if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                            break;
+                        }
+                    }
+                    let body = b"ok";
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = sock.write_all(response.as_bytes()).await;
+                    let _ = sock.write_all(body).await;
+                });
+            }
+        });
+
+        let state = test_state().await;
+        let api_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("api bind");
+        let api_addr = api_listener.local_addr().unwrap();
+        let app = crate::build_router(state.clone());
+        tokio::spawn(async move {
+            axum::serve(
+                api_listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
+            .expect("api serve");
+        });
+
+        // Build the attack body with serde so the template (CRLFs and markers)
+        // is encoded correctly.
+        let template = format!(
+            "GET http://{upstream_addr}/probe-\u{00a7}x\u{00a7} HTTP/1.1\r\nHost: {upstream_addr}\r\nConnection: close\r\n\r\n"
+        );
+        let body = serde_json::json!({
+            "template": template,
+            "config": {
+                "positions": [{ "start": 0, "end": 0, "name": "x" }],
+                "payloads": ["alpha", "beta"],
+                "attack_type": "Sniper",
+                "options": { "concurrency": 2, "delay_ms": 0 }
+            }
+        })
+        .to_string();
+
+        // POST /api/intruder/start
+        let start = post_json(api_addr, "/api/intruder/start", &body).await;
+        assert!(
+            start.contains("200 OK"),
+            "intruder start was rejected: {start}"
+        );
+
+        // Poll GET /api/intruder/status until the attack drains (2 payloads).
+        let mut drained = false;
+        for _ in 0..50 {
+            let status = get_path(api_addr, "/api/intruder/status").await;
+            if status.contains("\"result_count\":2") && status.contains("\"running\":false") {
+                drained = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(drained, "attack did not finish with 2 results in time");
+
+        // GET /api/intruder/results must carry both payloads.
+        let results = get_path(api_addr, "/api/intruder/results").await;
+        assert!(
+            results.contains("alpha") && results.contains("beta"),
+            "results did not come back over the API: {results}"
+        );
+        assert!(
+            results.contains("\"status_code\":200"),
+            "upstream status was not recorded: {results}"
+        );
+    }
+
+    async fn post_json(addr: SocketAddr, path: &str, body: &str) -> String {
+        let mut sock = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("api connect");
+        let req = format!(
+            "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.as_bytes().len()
+        );
+        sock.write_all(req.as_bytes()).await.expect("api write");
+        read_response(sock).await
+    }
+
+    async fn get_path(addr: SocketAddr, path: &str) -> String {
+        let mut sock = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("api connect");
+        let req = format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+        sock.write_all(req.as_bytes()).await.expect("api write");
+        read_response(sock).await
+    }
+
+    async fn read_response(mut sock: tokio::net::TcpStream) -> String {
+        let mut out = String::new();
+        let mut tmp = [0u8; 2048];
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_secs(3), sock.read(&mut tmp)).await
+            {
+                Ok(Ok(0)) | Err(_) => break,
+                Ok(Ok(n)) => out.push_str(&String::from_utf8_lossy(&tmp[..n])),
+                Ok(Err(_)) => break,
+            }
+        }
+        out
     }
 }

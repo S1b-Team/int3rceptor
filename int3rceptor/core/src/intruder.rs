@@ -56,6 +56,14 @@ pub struct IntruderResult {
     pub duration_ms: u64,
 }
 
+/// Snapshot of an attack: whether it is still sending and how many results
+/// have landed so far. Lets an API client poll start -> status -> results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntruderStatus {
+    pub running: bool,
+    pub result_count: usize,
+}
+
 pub struct Intruder {
     results: Arc<RwLock<Vec<IntruderResult>>>,
     is_running: Arc<AtomicBool>,
@@ -159,6 +167,14 @@ impl Intruder {
 
     pub fn is_running(&self) -> bool {
         self.is_running.load(Ordering::SeqCst)
+    }
+
+    /// Current attack state plus the number of results collected so far.
+    pub fn status(&self) -> IntruderStatus {
+        IntruderStatus {
+            running: self.is_running(),
+            result_count: self.results.read().len(),
+        }
     }
 
     /// Generate requests with their associated payloads
@@ -335,6 +351,36 @@ fn parse_request(raw: &str) -> Result<Request<ProxyBody>> {
     }
 
     Ok(builder.body(ProxyBody::from(bytes::Bytes::from(body_content)))?)
+}
+
+/// A small set of plain, commonly-used fuzzing inputs for payload positions.
+///
+/// These are generic probe values: empty input, numeric boundaries, booleans,
+/// a few common account names, and an over-long string. They are deliberately
+/// not exploit strings; this is a defensive testing tool, so building a real
+/// attack wordlist is left to the operator.
+pub fn common_payloads() -> Vec<String> {
+    [
+        "",
+        "0",
+        "1",
+        "-1",
+        "true",
+        "false",
+        "null",
+        "admin",
+        "test",
+        "guest",
+        "user",
+        "2147483647",
+        "-2147483648",
+        "99999999999999999999",
+        "          ",
+        &"A".repeat(256),
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
 }
 
 impl Default for Intruder {
@@ -522,5 +568,38 @@ mod tests {
         let results = intruder.get_results();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].request_id, 999);
+    }
+
+    #[test]
+    fn test_common_payloads_non_empty_and_plain() {
+        let payloads = common_payloads();
+        assert!(!payloads.is_empty());
+        // Defensive tool: the built-in set must not ship exploit strings.
+        for p in &payloads {
+            assert!(!p.contains("DROP TABLE"));
+            assert!(!p.contains("<script"));
+            assert!(!p.contains("../"));
+            assert!(!p.contains("OR '1'='1"));
+        }
+    }
+
+    #[test]
+    fn test_status_tracks_results() {
+        let intruder = Intruder::new();
+        let before = intruder.status();
+        assert!(!before.running);
+        assert_eq!(before.result_count, 0);
+
+        intruder.add_result(IntruderResult {
+            request_id: 1,
+            payload: "p".to_string(),
+            status_code: 200,
+            response_length: 1,
+            duration_ms: 1,
+        });
+
+        let after = intruder.status();
+        assert!(!after.running);
+        assert_eq!(after.result_count, 1);
     }
 }
