@@ -126,6 +126,8 @@ pub fn router() -> Router {
         )
         .route("/api/intruder/start", post(intruder_start))
         .route("/api/intruder/stop", post(intruder_stop))
+        .route("/api/intruder/status", get(intruder_status))
+        .route("/api/intruder/payloads", get(intruder_payloads))
         // Scanner routes
         .route(
             "/api/scanner/config",
@@ -155,7 +157,10 @@ pub fn router() -> Router {
         .route("/api/metrics/reset", post(reset_metrics))
         .route("/api/health", get(health_check))
         .route("/api/dashboard/activity", get(get_dashboard_activity))
-        .route("/api/dashboard/activity/clear", delete(clear_dashboard_activity))
+        .route(
+            "/api/dashboard/activity/clear",
+            delete(clear_dashboard_activity),
+        )
         // Security management routes
         .route(
             "/api/security/ip-filter",
@@ -185,7 +190,10 @@ pub fn router() -> Router {
         .route("/api/proxy/start", post(proxy_start))
         .route("/api/proxy/stop", post(proxy_stop))
         // Interactive intercept queue
-        .route("/api/intercept", get(list_intercept).put(set_intercept_enabled))
+        .route(
+            "/api/intercept",
+            get(list_intercept).put(set_intercept_enabled),
+        )
         .route("/api/intercept/:id/forward", post(intercept_forward))
         .route("/api/intercept/:id/drop", post(intercept_drop))
         .route("/api/intercept/:id/edit", post(intercept_edit))
@@ -244,7 +252,11 @@ async fn repeat_request(
     let body_bytes = if let Some(body) = payload.modified_body {
         let bytes = body.into_bytes();
         if bytes.len() > MAX_BODY_SIZE {
-            return (StatusCode::PAYLOAD_TOO_LARGE, "Request body exceeds maximum size of 10MB").into_response();
+            return (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Request body exceeds maximum size of 10MB",
+            )
+                .into_response();
         }
         bytes
     } else {
@@ -582,6 +594,15 @@ async fn intruder_stop(Extension(state): Extension<Arc<AppState>>) -> impl IntoR
     StatusCode::OK
 }
 
+async fn intruder_status(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.intruder.status())
+}
+
+/// Built-in list of plain fuzzing payloads a client can load as a starting set.
+async fn intruder_payloads() -> impl IntoResponse {
+    Json(json!({ "payloads": interceptor_core::intruder::common_payloads() }))
+}
+
 #[derive(Deserialize)]
 struct IntruderGenerateRequest {
     template: String,
@@ -645,43 +666,45 @@ async fn clear_dashboard_activity(Extension(state): Extension<Arc<AppState>>) ->
 /// Validates URL to prevent SSRF attacks
 fn validate_url(url: &str) -> Result<reqwest::Url, String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
-    
+
     // Check scheme
     let scheme = parsed.scheme();
     if scheme != "http" && scheme != "https" {
         return Err("Only HTTP and HTTPS URLs are allowed".to_string());
     }
-    
+
     // Check host
     let host = parsed.host_str().ok_or("URL must have a host")?;
-    
+
     // Block private IP ranges and localhost
-    if host == "localhost" 
+    if host == "localhost"
         || host == "127.0.0.1"
         || host.starts_with("10.")
         || host.starts_with("192.168.")
         || host.starts_with("172.")
         || host == "[::1]"
         || host.starts_with("[fc00:")
-        || host.starts_with("[fe80:") {
+        || host.starts_with("[fe80:")
+    {
         return Err("Access to internal addresses is not allowed".to_string());
     }
-    
+
     // Check for IP addresses in private ranges
     if let Ok(ip) = host.parse::<std::net::IpAddr>() {
         let is_internal = match ip {
             std::net::IpAddr::V4(ipv4) => {
-                ipv4.is_loopback() || ipv4.is_private() || ipv4.is_link_local() || ipv4.is_multicast()
+                ipv4.is_loopback()
+                    || ipv4.is_private()
+                    || ipv4.is_link_local()
+                    || ipv4.is_multicast()
             }
-            std::net::IpAddr::V6(ipv6) => {
-                ipv6.is_loopback() || ipv6.is_multicast()
-            }
+            std::net::IpAddr::V6(ipv6) => ipv6.is_loopback() || ipv6.is_multicast(),
         };
         if is_internal {
             return Err("Access to internal IP addresses is not allowed".to_string());
         }
     }
-    
+
     Ok(parsed)
 }
 
@@ -977,7 +1000,6 @@ async fn project_new(
     StatusCode::OK
 }
 
-
 // ============= PROXY CONTROL =============
 
 async fn proxy_status(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
@@ -1101,7 +1123,10 @@ async fn intercept_edit(
         match BASE64.decode(b64.as_bytes()) {
             Ok(bytes) => Some(bytes),
             Err(_) => {
-                return (StatusCode::BAD_REQUEST, Json(json!({ "error": "invalid body_base64" })))
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid body_base64" })),
+                )
                     .into_response();
             }
         }
@@ -1130,7 +1155,8 @@ mod proxy_route_tests {
     use interceptor_core::{
         capture::RequestCapture, cert_manager::CertManager, connection_pool::ConnectionPool,
         plugin::config::PluginSystemConfig, plugin::manager::PluginManager, rules::RuleEngine,
-        InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager, WsCapture,
+        InterceptQueue, Intruder, ProjectManager, ProxyController, Scanner, ScopeManager,
+        WsCapture,
     };
     use std::net::SocketAddr;
     use std::sync::Arc;
@@ -1267,7 +1293,9 @@ mod proxy_route_tests {
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 body.len()
             );
-            sock.write_all(response.as_bytes()).await.expect("upstream write");
+            sock.write_all(response.as_bytes())
+                .await
+                .expect("upstream write");
             sock.write_all(body).await.expect("upstream body");
         });
 
@@ -1351,7 +1379,9 @@ mod proxy_route_tests {
             listed.clear();
             let mut tmp = [0u8; 2048];
             loop {
-                match tokio::time::timeout(std::time::Duration::from_secs(2), api.read(&mut tmp)).await {
+                match tokio::time::timeout(std::time::Duration::from_secs(2), api.read(&mut tmp))
+                    .await
+                {
                     Ok(Ok(0)) | Err(_) => break,
                     Ok(Ok(n)) => listed.push_str(&String::from_utf8_lossy(&tmp[..n])),
                     Ok(Err(_)) => break,
@@ -1619,5 +1649,177 @@ mod proxy_route_tests {
             rustls::pki_types::PrivatePkcs8KeyDer::from(leaf_key.serialize_der()),
         );
         (ca_der, leaf_der, key)
+    }
+
+    /// An attack started over the API must surface its results over the API:
+    /// POST /api/intruder/start, observe running while upstream is held open,
+    /// then release and confirm final rows on GET /api/intruder/results.
+    #[tokio::test]
+    async fn intruder_attack_results_come_back_over_api() {
+        interceptor_core::connection_pool::install_crypto_provider();
+
+        // Gate: upstream holds each response open until the test releases it,
+        // so status can be observed while the attack is still in flight.
+        let (release_tx, release_rx) = tokio::sync::watch::channel(false);
+        let arrived = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("upstream bind");
+        let upstream_addr = upstream.local_addr().unwrap();
+        let arrived_up = arrived.clone();
+        tokio::spawn(async move {
+            loop {
+                let (mut sock, _) = match upstream.accept().await {
+                    Ok(pair) => pair,
+                    Err(_) => return,
+                };
+                let mut release_rx = release_rx.clone();
+                let arrived = arrived_up.clone();
+                tokio::spawn(async move {
+                    let mut buf = Vec::new();
+                    let mut tmp = [0u8; 1024];
+                    loop {
+                        let n = match sock.read(&mut tmp).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => n,
+                        };
+                        buf.extend_from_slice(&tmp[..n]);
+                        if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                            break;
+                        }
+                    }
+                    arrived.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    while !*release_rx.borrow() {
+                        if release_rx.changed().await.is_err() {
+                            return;
+                        }
+                    }
+                    let body = b"ok";
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = sock.write_all(response.as_bytes()).await;
+                    let _ = sock.write_all(body).await;
+                });
+            }
+        });
+
+        let state = test_state().await;
+        let api_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("api bind");
+        let api_addr = api_listener.local_addr().unwrap();
+        let app = crate::build_router(state.clone());
+        tokio::spawn(async move {
+            axum::serve(
+                api_listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
+            .expect("api serve");
+        });
+
+        // Build the attack body with serde so the template (CRLFs and markers)
+        // is encoded correctly.
+        let template = format!(
+            "GET http://{upstream_addr}/probe-\u{00a7}x\u{00a7} HTTP/1.1\r\nHost: {upstream_addr}\r\nConnection: close\r\n\r\n"
+        );
+        let body = serde_json::json!({
+            "template": template,
+            "config": {
+                "positions": [{ "start": 0, "end": 0, "name": "x" }],
+                "payloads": ["alpha", "beta"],
+                "attack_type": "Sniper",
+                "options": { "concurrency": 2, "delay_ms": 0 }
+            }
+        })
+        .to_string();
+
+        // POST /api/intruder/start
+        let start = post_json(api_addr, "/api/intruder/start", &body).await;
+        assert!(
+            start.contains("200 OK"),
+            "intruder start was rejected: {start}"
+        );
+
+        // Wait until at least one probe has reached the held-open upstream.
+        let mut saw_arrival = false;
+        for _ in 0..50 {
+            if arrived.load(std::sync::atomic::Ordering::SeqCst) > 0 {
+                saw_arrival = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(saw_arrival, "upstream never saw an in-flight probe");
+
+        // While upstream is still holding responses, status must report running.
+        let mid = get_path(api_addr, "/api/intruder/status").await;
+        assert!(
+            mid.contains("\"running\":true"),
+            "status did not report running while attack was in flight: {mid}"
+        );
+
+        // Release upstream so in-flight requests can finish.
+        release_tx.send(true).expect("release send");
+
+        // Poll GET /api/intruder/status until the attack drains (2 payloads).
+        let mut drained = false;
+        for _ in 0..50 {
+            let status = get_path(api_addr, "/api/intruder/status").await;
+            if status.contains("\"result_count\":2") && status.contains("\"running\":false") {
+                drained = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(drained, "attack did not finish with 2 results in time");
+
+        // GET /api/intruder/results must carry both payloads.
+        let results = get_path(api_addr, "/api/intruder/results").await;
+        assert!(
+            results.contains("alpha") && results.contains("beta"),
+            "results did not come back over the API: {results}"
+        );
+        assert!(
+            results.contains("\"status_code\":200"),
+            "upstream status was not recorded: {results}"
+        );
+    }
+
+    async fn post_json(addr: SocketAddr, path: &str, body: &str) -> String {
+        let mut sock = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("api connect");
+        let req = format!(
+            "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.as_bytes().len()
+        );
+        sock.write_all(req.as_bytes()).await.expect("api write");
+        read_response(sock).await
+    }
+
+    async fn get_path(addr: SocketAddr, path: &str) -> String {
+        let mut sock = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("api connect");
+        let req = format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+        sock.write_all(req.as_bytes()).await.expect("api write");
+        read_response(sock).await
+    }
+
+    async fn read_response(mut sock: tokio::net::TcpStream) -> String {
+        let mut out = String::new();
+        let mut tmp = [0u8; 2048];
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_secs(3), sock.read(&mut tmp)).await
+            {
+                Ok(Ok(0)) | Err(_) => break,
+                Ok(Ok(n)) => out.push_str(&String::from_utf8_lossy(&tmp[..n])),
+                Ok(Err(_)) => break,
+            }
+        }
+        out
     }
 }
