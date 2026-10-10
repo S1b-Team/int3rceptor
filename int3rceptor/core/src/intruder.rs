@@ -17,10 +17,21 @@ pub struct IntruderConfig {
     pub options: IntruderOptions,
 }
 
+/// Default per-request timeout when `IntruderOptions::timeout_ms` is 0 or omitted.
+pub const DEFAULT_REQUEST_TIMEOUT_MS: u64 = 30_000;
+
+fn default_timeout_ms() -> u64 {
+    DEFAULT_REQUEST_TIMEOUT_MS
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntruderOptions {
     pub concurrency: usize,
     pub delay_ms: u64,
+    /// Cap how long each probe waits for headers + body. Stop aborts in-flight
+    /// tasks; this timeout still covers hung targets when an attack is not stopped.
+    #[serde(default = "default_timeout_ms")]
+    pub timeout_ms: u64,
 }
 
 impl Default for IntruderOptions {
@@ -28,6 +39,7 @@ impl Default for IntruderOptions {
         Self {
             concurrency: 1,
             delay_ms: 0,
+            timeout_ms: DEFAULT_REQUEST_TIMEOUT_MS,
         }
     }
 }
@@ -70,6 +82,8 @@ pub struct Intruder {
     is_running: Arc<AtomicBool>,
     /// Cleared by stop; launch loop checks this so status can stay running while draining.
     launch_requests: Arc<AtomicBool>,
+    /// Abort handles for in-flight probes so stop can cancel hung upstream waits.
+    in_flight: Arc<RwLock<Vec<tokio::task::AbortHandle>>>,
 }
 
 impl Intruder {
@@ -78,6 +92,7 @@ impl Intruder {
             results: Arc::new(RwLock::new(Vec::new())),
             is_running: Arc::new(AtomicBool::new(false)),
             launch_requests: Arc::new(AtomicBool::new(false)),
+            in_flight: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -92,13 +107,20 @@ impl Intruder {
         }
 
         self.launch_requests.store(true, Ordering::SeqCst);
+        self.in_flight.write().clear();
         self.clear_results();
         let requests = self.generate_requests(&template, &config)?;
         let results = self.results.clone();
         let is_running = self.is_running.clone();
         let launch_requests = self.launch_requests.clone();
+        let in_flight = self.in_flight.clone();
         let concurrency = config.options.concurrency.max(1);
         let delay = config.options.delay_ms;
+        let timeout_ms = if config.options.timeout_ms == 0 {
+            DEFAULT_REQUEST_TIMEOUT_MS
+        } else {
+            config.options.timeout_ms
+        };
 
         tokio::spawn(async move {
             let semaphore = Arc::new(tokio::sync::Semaphore::new(concurrency));
@@ -110,57 +132,65 @@ impl Intruder {
                 }
 
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
+                // Re-check after the semaphore wait: stop may have landed while we queued.
+                if !launch_requests.load(Ordering::SeqCst) {
+                    drop(permit);
+                    break;
+                }
+
                 let pool = pool.clone();
                 let results = results.clone();
                 let req_str = req_str.clone();
                 let payload = payload.clone();
+                let launch_requests = launch_requests.clone();
 
                 if delay > 0 {
                     tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
+                    if !launch_requests.load(Ordering::SeqCst) {
+                        drop(permit);
+                        break;
+                    }
                 }
 
-                handles.push(tokio::spawn(async move {
+                let handle = tokio::spawn(async move {
                     let _permit = permit;
                     let start = Instant::now();
 
-                    // Parse and send
-                    match parse_request(&req_str) {
-                        Ok(req) => {
-                            let client = pool.client();
-                            match client.request(req).await {
-                                Ok(resp) => {
-                                    let status = resp.status().as_u16();
-                                    let mut body_len = 0;
-                                    // Read body to get length (and consume it)
-                                    if let Ok(bytes) = resp.collect().await {
-                                        body_len = bytes.to_bytes().len();
-                                    }
+                    let Ok(req) = parse_request(&req_str) else {
+                        return;
+                    };
 
-                                    results.write().push(IntruderResult {
-                                        request_id: id,
-                                        payload,
-                                        status_code: status,
-                                        response_length: body_len,
-                                        duration_ms: start.elapsed().as_millis() as u64,
-                                    });
-                                }
-                                Err(_) => {
-                                    // Log error or store failed result
-                                }
-                            }
-                        }
-                        Err(_) => {
-                            // Parse error
-                        }
+                    let client = pool.client();
+                    let timeout = tokio::time::Duration::from_millis(timeout_ms);
+                    let outcome = tokio::time::timeout(timeout, async {
+                        let resp = client.request(req).await.ok()?;
+                        let status = resp.status().as_u16();
+                        let body_len = resp.collect().await.ok()?.to_bytes().len();
+                        Some((status, body_len))
+                    })
+                    .await;
+
+                    if let Ok(Some((status, body_len))) = outcome {
+                        results.write().push(IntruderResult {
+                            request_id: id,
+                            payload,
+                            status_code: status,
+                            response_length: body_len,
+                            duration_ms: start.elapsed().as_millis() as u64,
+                        });
                     }
-                }));
+                });
+
+                in_flight.write().push(handle.abort_handle());
+                handles.push(handle);
             }
 
-            // Wait for all to finish
+            // Wait for all to finish (or abort after stop).
             for handle in handles {
                 let _ = handle.await;
             }
 
+            in_flight.write().clear();
             launch_requests.store(false, Ordering::SeqCst);
             is_running.store(false, Ordering::SeqCst);
         });
@@ -169,8 +199,12 @@ impl Intruder {
     }
 
     pub fn stop_attack(&self) {
-        // Stop launching new requests; keep is_running true until in-flight work drains.
+        // Stop launching new requests and cancel in-flight probes so a hung
+        // upstream cannot leave is_running stuck true forever.
         self.launch_requests.store(false, Ordering::SeqCst);
+        for handle in self.in_flight.write().drain(..) {
+            handle.abort();
+        }
     }
 
     pub fn is_running(&self) -> bool {
@@ -610,5 +644,92 @@ mod tests {
         let after = intruder.status();
         assert!(!after.running);
         assert_eq!(after.result_count, 1);
+    }
+
+    /// A hung upstream must not leave the attack stuck after stop: status
+    /// drains, then a fresh start is accepted.
+    #[tokio::test]
+    async fn stop_clears_running_when_upstream_hangs() {
+        use crate::connection_pool::{install_crypto_provider, ConnectionPool};
+        use tokio::io::AsyncReadExt;
+
+        install_crypto_provider();
+
+        let upstream = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("upstream bind");
+        let upstream_addr = upstream.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut sock, _) = match upstream.accept().await {
+                    Ok(pair) => pair,
+                    Err(_) => return,
+                };
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    let _ = sock.read(&mut buf).await;
+                    // Never respond: request()/collect() would hang without timeout/abort.
+                    std::future::pending::<()>().await;
+                });
+            }
+        });
+
+        let intruder = Intruder::new();
+        let pool = ConnectionPool::new();
+        let template = format!(
+            "GET http://{upstream_addr}/probe-\u{00a7}p\u{00a7} HTTP/1.1\r\nHost: {upstream_addr}\r\nConnection: close\r\n\r\n"
+        );
+        let config = IntruderConfig {
+            positions: vec![IntruderPosition {
+                start: 0,
+                end: 0,
+                name: "p".to_string(),
+            }],
+            payloads: vec!["one".to_string(), "two".to_string()],
+            attack_type: AttackType::Sniper,
+            options: IntruderOptions {
+                concurrency: 2,
+                delay_ms: 0,
+                // Long enough that abort-on-stop is what clears running, not the timer.
+                timeout_ms: 10_000,
+            },
+        };
+
+        intruder
+            .start_attack(template.clone(), config.clone(), pool.clone())
+            .await
+            .expect("first start");
+
+        let mut saw_running = false;
+        for _ in 0..50 {
+            if intruder.is_running() {
+                saw_running = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(saw_running, "attack never reported running");
+
+        intruder.stop_attack();
+
+        let mut drained = false;
+        for _ in 0..50 {
+            if !intruder.is_running() {
+                drained = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        assert!(
+            drained,
+            "stop left the attack running while upstream was hung"
+        );
+
+        intruder
+            .start_attack(template, config, pool)
+            .await
+            .expect("start after stop must succeed");
+        assert!(intruder.is_running());
+        intruder.stop_attack();
     }
 }
