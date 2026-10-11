@@ -600,8 +600,11 @@ async fn intruder_status(Extension(state): Extension<Arc<AppState>>) -> impl Int
 }
 
 /// Built-in list of plain fuzzing payloads a client can load as a starting set.
+///
+/// Goes through [`interceptor_core::intruder::active_payloads`] so a `pro`
+/// build can supply premium payload intelligence without changing this route.
 async fn intruder_payloads() -> impl IntoResponse {
-    Json(json!({ "payloads": interceptor_core::intruder::common_payloads() }))
+    Json(json!({ "payloads": interceptor_core::intruder::active_payloads() }))
 }
 
 #[derive(Deserialize)]
