@@ -198,21 +198,35 @@
 </template>
 
 <script setup lang="ts">
-import { useApi } from '@/composables/useApi';
-import type { AttackType, IntruderConfig, IntruderResult } from '@/types';
+import { useIntruder } from '@/composables/useIntruder';
+import type {
+  AttackType,
+  CaptureEntry,
+  IntruderConfig,
+  IntruderResult,
+} from '@/types';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-const { intruderGenerate, intruderResults, intruderClear, intruderStart, intruderStop } = useApi();
+const props = defineProps<{ entry?: CaptureEntry | null }>();
+
+const {
+  running,
+  results,
+  startAttack: startIntruderAttack,
+  stopAttack: stopIntruderAttack,
+  refreshResults,
+  clearResults: clearIntruderResults,
+  loadPayloads,
+  generatePreview,
+  stopPolling,
+} = useIntruder();
 
 const template = ref('');
 const payloadsText = ref('');
 const attackType = ref<AttackType>('Sniper');
-const running = ref(false);
-const results = ref<IntruderResult[]>([]);
 const generatedRequests = ref<string[]>([]);
 const concurrency = ref(1);
 const delay = ref(0);
-const pollingInterval = ref<number | null>(null);
 
 const attackTypes = [
   {
@@ -245,7 +259,7 @@ const detectedPositions = computed(() => {
   const regex = /§(\w+)§/g;
   const matches = [...template.value.matchAll(regex)];
   const unique = new Set(matches.map(m => m[1]));
-  return Array.from(unique).map((name, idx) => ({
+  return Array.from(unique).map(name => ({
     name,
     start: 0,
     end: 0,
@@ -287,92 +301,83 @@ const canGenerate = computed(() => {
   );
 });
 
+const buildConfig = (): IntruderConfig => ({
+  positions: detectedPositions.value,
+  payloads: payloadsList.value,
+  attack_type: attackType.value,
+  options: {
+    concurrency: concurrency.value,
+    delay_ms: delay.value,
+  },
+});
+
 const startAttack = async () => {
-  if (!canGenerate.value) return;
+  if (!canGenerate.value || running.value) return;
 
-  running.value = true;
   generatedRequests.value = [];
-  results.value = [];
+  const config = buildConfig();
 
-  try {
-    const config: IntruderConfig = {
-      positions: detectedPositions.value,
-      payloads: payloadsList.value,
-      attack_type: attackType.value,
-      options: {
-        concurrency: concurrency.value,
-        delay_ms: delay.value,
-      },
-    };
+  // Preview the generated requests first so the operator can sanity-check
+  // them; this is best-effort and never blocks the attack from starting.
+  generatedRequests.value = await generatePreview({
+    template: template.value,
+    config,
+  });
 
-    // First generate preview (optional, but good for UI)
-    try {
-      const preview = await intruderGenerate({ template: template.value, config });
-      generatedRequests.value = preview.requests;
-    } catch (e) {
-      console.warn("Failed to generate preview", e);
-    }
-
-    await intruderStart({
-      template: template.value,
-      config,
-    });
-
-    // Start polling
-    startPolling();
-  } catch (error) {
-    console.error('Failed to start attack:', error);
-    alert('Failed to start attack. Check console for details.');
-    running.value = false;
-  }
+  await startIntruderAttack({ template: template.value, config });
 };
 
 const stopAttack = async () => {
-  try {
-    await intruderStop();
-  } catch (error) {
-    console.error('Failed to stop attack:', error);
-  } finally {
-    stopPolling();
-    running.value = false;
-  }
-};
-
-const startPolling = () => {
-  if (pollingInterval.value) clearInterval(pollingInterval.value);
-  pollingInterval.value = window.setInterval(async () => {
-    await refreshResults();
-    // TODO: Check if attack finished from backend status
-  }, 500);
-};
-
-const stopPolling = () => {
-  if (pollingInterval.value) {
-    clearInterval(pollingInterval.value);
-    pollingInterval.value = null;
-  }
-};
-
-const refreshResults = async () => {
-  try {
-    results.value = await intruderResults();
-  } catch (error) {
-    console.error('Failed to fetch results:', error);
-  }
+  await stopIntruderAttack();
 };
 
 const clearResults = async () => {
+  await clearIntruderResults();
+  generatedRequests.value = [];
+};
+
+const decodeBody = (bytes: number[] | undefined): string => {
+  if (!bytes || bytes.length === 0) return '';
   try {
-    await intruderClear();
-    results.value = [];
-    generatedRequests.value = [];
-  } catch (error) {
-    console.error('Failed to clear results:', error);
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  } catch {
+    return '';
   }
 };
 
+// Build an editable raw HTTP request from a captured entry so the operator can
+// drop §markers§ into the fields they want to fuzz.
+const buildTemplate = (entry: CaptureEntry): string => {
+  const req = entry.request;
+  let path = req.url;
+  let host = '';
+  try {
+    const parsed = new URL(req.url);
+    path = `${parsed.pathname}${parsed.search}`;
+    host = parsed.host;
+  } catch {
+    // Relative or unparseable URL; keep the raw value in the request line.
+  }
+
+  const lines = [`${req.method} ${path} HTTP/1.1`];
+  const hasHost = req.headers.some(([name]) => name.toLowerCase() === 'host');
+  if (host && !hasHost) {
+    lines.push(`Host: ${host}`);
+  }
+  for (const [name, value] of req.headers) {
+    lines.push(`${name}: ${value}`);
+  }
+
+  return `${lines.join('\n')}\n\n${decodeBody(req.body)}`;
+};
+
 const loadFromRepeater = () => {
-  // TODO: Integrate with selected request from traffic tab
+  if (props.entry) {
+    template.value = buildTemplate(props.entry);
+    return;
+  }
+
+  // No request selected: seed an editable example so the flow is still usable.
   template.value = `POST /api/login HTTP/1.1
 Host: example.com
 Content-Type: application/json
@@ -383,21 +388,11 @@ Content-Type: application/json
 }`;
 };
 
-const loadCommonPayloads = () => {
-  payloadsText.value = `admin
-root
-test
-administrator
-guest
-' OR '1'='1
-" OR "1"="1
-1' OR '1'='1
-admin' --
-admin' #
-1; DROP TABLE users--
-<scr'+'ipt>alert('XSS')</scr'+'ipt>
-../../../etc/passwd
-..\\..\\..\\windows\\system32\\config\\sam`;
+const loadCommonPayloads = async () => {
+  const payloads = await loadPayloads();
+  if (payloads.length > 0) {
+    payloadsText.value = payloads.join('\n');
+  }
 };
 
 const clearPayloads = () => {
