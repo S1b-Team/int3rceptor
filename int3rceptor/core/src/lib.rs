@@ -49,4 +49,4 @@ pub use security::{
     RateLimitResult, RateLimiter, TlsConfig,
 };
 pub use storage::CaptureStorage;
-pub use websocket::WsCapture;
+pub use websocket::{WsCapture, WsStats};

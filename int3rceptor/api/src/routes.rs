@@ -146,6 +146,7 @@ pub fn router() -> Router {
         .route("/api/comparer/diff", post(comparer_diff))
         .route("/api/websocket/connections", get(ws_connections))
         .route("/api/websocket/frames/:connection_id", get(ws_frames))
+        .route("/api/websocket/stats", get(ws_stats))
         .route("/api/websocket/clear", delete(ws_clear))
         // Project routes
         .route("/api/project/save", post(project_save))
@@ -624,6 +625,10 @@ async fn ws_frames(
 async fn ws_clear(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
     state.ws_capture.clear();
     StatusCode::NO_CONTENT
+}
+
+async fn ws_stats(Extension(state): Extension<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.ws_capture.get_stats())
 }
 
 // Metrics handlers
@@ -1220,6 +1225,76 @@ mod proxy_route_tests {
             proxy,
             intercept,
         })
+    }
+
+
+    #[tokio::test]
+    async fn websocket_stats_contract() {
+        use interceptor_core::websocket::{WsDirection, WsFrameType};
+
+        let state = test_state().await;
+        state
+            .ws_capture
+            .register_connection("conn-a".into(), "wss://example.com/ws".into());
+        state
+            .ws_capture
+            .capture_frame(
+                "conn-a".into(),
+                WsDirection::ClientToServer,
+                WsFrameType::Text,
+                b"ping-body".to_vec(),
+                true,
+            )
+            .expect("capture frame");
+
+        let app = router().layer(Extension(state));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/websocket/stats")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+
+        assert_eq!(body["active_connections"], 1);
+        assert_eq!(body["total_connections"], 1);
+        assert_eq!(body["total_frames"], 1);
+        assert_eq!(body["text_frames"], 1);
+        assert_eq!(body["binary_frames"], 0);
+        assert_eq!(body["control_frames"], 0);
+        assert_eq!(body["total_bytes"], 9);
+        assert_eq!(body["frames_by_connection"]["conn-a"], 1);
+
+        // Idle capture still returns the full contract (zeros).
+        let idle_state = test_state().await;
+        let idle_app = router().layer(Extension(idle_state));
+        let idle_response = idle_app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/websocket/stats")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(idle_response.status(), StatusCode::OK);
+        let idle_bytes = idle_response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let idle: serde_json::Value = serde_json::from_slice(&idle_bytes).unwrap();
+        assert_eq!(idle["active_connections"], 0);
+        assert_eq!(idle["total_connections"], 0);
+        assert_eq!(idle["total_frames"], 0);
+        assert_eq!(idle["total_bytes"], 0);
+        assert!(idle["frames_by_connection"].as_object().unwrap().is_empty());
     }
 
     #[tokio::test]
