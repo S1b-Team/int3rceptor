@@ -156,7 +156,7 @@
         </template>
 
         <template v-else-if="currentTab === 'intruder'">
-            <IntruderTab />
+            <IntruderTab :entry="selectedEntry" />
         </template>
 
         <template v-else-if="currentTab === 'intercept'">

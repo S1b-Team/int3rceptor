@@ -107,6 +107,15 @@ export interface IntruderGenerateRequest {
 export interface IntruderGenerateResponse {
     requests: string[];
 }
+
+export interface IntruderStatus {
+    running: boolean;
+    result_count: number;
+}
+
+export interface IntruderPayloadsResponse {
+    payloads: string[];
+}
 export type MatchCondition =
     // Simple substring matching
     | { UrlContains: string }

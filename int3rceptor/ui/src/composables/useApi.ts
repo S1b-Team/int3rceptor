@@ -3,7 +3,9 @@ import type {
     HeaderField,
     IntruderGenerateRequest,
     IntruderGenerateResponse,
+    IntruderPayloadsResponse,
     IntruderResult,
+    IntruderStatus,
     ReplayResult,
     Rule,
     ScopeConfig,
@@ -111,6 +113,18 @@ export function useApi() {
         await api.post("/api/intruder/stop");
     };
 
+    const intruderStatus = async (): Promise<IntruderStatus> => {
+        const { data } = await api.get<IntruderStatus>("/api/intruder/status");
+        return data;
+    };
+
+    const intruderPayloads = async (): Promise<string[]> => {
+        const { data } = await api.get<IntruderPayloadsResponse>(
+            "/api/intruder/payloads"
+        );
+        return data.payloads;
+    };
+
 
     const listIntercept = async () => {
         const { data } = await api.get("/api/intercept");
@@ -160,6 +174,8 @@ export function useApi() {
         intruderClear,
         intruderStart,
         intruderStop,
+        intruderStatus,
+        intruderPayloads,
         listIntercept,
         setInterceptEnabled,
         forwardIntercept,
