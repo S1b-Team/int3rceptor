@@ -99,6 +99,13 @@ export function useIntruder(onNotify?: NotificationCallback): UseIntruderReturn 
     /** Handle for the active polling timer. */
     let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+    /**
+     * Identity for the current polling run. Bumped whenever polling starts or
+     * stops so in-flight callbacks from an older run are ignored and cannot
+     * clear a newer attack's timer.
+     */
+    let pollGeneration = 0;
+
     // ==========================================
     // Helper Functions
     // ==========================================
@@ -217,8 +224,13 @@ export function useIntruder(onNotify?: NotificationCallback): UseIntruderReturn 
     const startAttack = async (
         request: IntruderGenerateRequest,
     ): Promise<boolean> => {
-        if (isOperating.value) {
-            notify("An Intruder operation is already in progress", "warning");
+        if (isOperating.value || running.value) {
+            notify(
+                running.value
+                    ? "An attack is already running"
+                    : "An Intruder operation is already in progress",
+                "warning",
+            );
             return false;
         }
 
@@ -287,19 +299,48 @@ export function useIntruder(onNotify?: NotificationCallback): UseIntruderReturn 
      */
     const startPolling = (): void => {
         stopPolling();
+        const generation = ++pollGeneration;
         pollTimer = setInterval(async () => {
-            const status = await getStatus();
-            await refreshResults();
-            if (status && !status.running) {
-                stopPolling();
+            try {
+                const { data: status } = await api.get<IntruderStatus>(
+                    "/api/intruder/status",
+                );
+                // Stale run: a newer start/stop already took over. Skip applying
+                // state so an older response cannot clobber the new attack.
+                if (generation !== pollGeneration) {
+                    return;
+                }
+                if (status) {
+                    running.value = status.running;
+                    resultCount.value = status.result_count;
+                }
+
+                const { data: rows } = await api.get<IntruderResult[]>(
+                    "/api/intruder/results",
+                );
+                if (generation !== pollGeneration) {
+                    return;
+                }
+                results.value = rows ?? [];
+
+                if (status && !status.running) {
+                    stopPolling();
+                }
+            } catch (err) {
+                if (generation !== pollGeneration) {
+                    return;
+                }
+                handleError("Poll attack", err);
             }
         }, INTRUDER_POLL_INTERVAL_MS);
     };
 
     /**
-     * Stop the polling loop if it is active.
+     * Stop the polling loop if it is active. Also invalidates in-flight poll
+     * callbacks so they cannot tear down a later run.
      */
     const stopPolling = (): void => {
+        pollGeneration += 1;
         if (pollTimer !== null) {
             clearInterval(pollTimer);
             pollTimer = null;

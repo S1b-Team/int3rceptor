@@ -133,7 +133,7 @@ describe('useIntruder', () => {
       mockPost.mockResolvedValue({});
       mockGet.mockResolvedValue({ data: runningStatus });
 
-      const { startAttack, running, results } = useIntruder();
+      const { startAttack, running, results, stopPolling } = useIntruder();
       const ok = await startAttack({
         template: 'GET /§x§ HTTP/1.1',
         config: {
@@ -151,17 +151,20 @@ describe('useIntruder', () => {
       );
       expect(running.value).toBe(true);
       expect(results.value).toEqual([]);
+      stopPolling();
     });
 
     it('does not start a second attack while one is operating', async () => {
+      vi.useFakeTimers();
       let resolvePost: (value: any) => void = () => {};
       mockPost.mockImplementation(
         () => new Promise(resolve => {
           resolvePost = resolve;
         }),
       );
+      mockGet.mockResolvedValue({ data: runningStatus });
 
-      const { startAttack } = useIntruder();
+      const { startAttack, stopPolling } = useIntruder();
       const req = {
         template: 't',
         config: {
@@ -180,6 +183,9 @@ describe('useIntruder', () => {
       resolvePost({});
       await p1;
       await p2;
+
+      // Successful start arms a poll interval; clear it so it cannot leak.
+      stopPolling();
     });
 
     it('reports failure and leaves running false on error', async () => {
@@ -213,7 +219,7 @@ describe('useIntruder', () => {
         .mockResolvedValueOnce({ data: doneStatus }) // tick 2 status
         .mockResolvedValueOnce({ data: sampleResults }); // tick 2 results
 
-      const { startAttack, running } = useIntruder();
+      const { startAttack, running, stopPolling } = useIntruder();
       await startAttack({
         template: 't',
         config: {
@@ -236,6 +242,7 @@ describe('useIntruder', () => {
       await vi.advanceTimersByTimeAsync(INTRUDER_POLL_INTERVAL_MS * 3);
       // No further polling after the loop stopped.
       expect(mockGet.mock.calls.length).toBe(callsAfterStop);
+      stopPolling();
     });
   });
 

@@ -107,10 +107,11 @@
           <div class="launch-actions">
             <button
               @click="startAttack"
-              :disabled="!canGenerate || running"
+              :disabled="!canGenerate || running || starting || isOperating"
               class="btn-primary btn-large"
             >
               <span v-if="running">🚀 Attack Running...</span>
+              <span v-else-if="starting || isOperating">⏳ Starting...</span>
               <span v-else>🚀 Start Attack ({{ estimatedRequests }} requests)</span>
             </button>
             <button
@@ -120,6 +121,10 @@
             >
               🛑 Stop Attack
             </button>
+          </div>
+          <div v-if="lastError" class="error-alert" role="alert">
+            <span class="error-icon">⚠️</span>
+            <span class="error-message">{{ lastError }}</span>
           </div>
         </section>
       </div>
@@ -211,7 +216,9 @@ const props = defineProps<{ entry?: CaptureEntry | null }>();
 
 const {
   running,
+  isOperating,
   results,
+  lastError,
   startAttack: startIntruderAttack,
   stopAttack: stopIntruderAttack,
   refreshResults,
@@ -220,6 +227,9 @@ const {
   generatePreview,
   stopPolling,
 } = useIntruder();
+
+/** Covers the preview + start sequence so double-clicks cannot race. */
+const starting = ref(false);
 
 const template = ref('');
 const payloadsText = ref('');
@@ -312,19 +322,26 @@ const buildConfig = (): IntruderConfig => ({
 });
 
 const startAttack = async () => {
-  if (!canGenerate.value || running.value) return;
+  if (!canGenerate.value || running.value || isOperating.value || starting.value) {
+    return;
+  }
 
+  starting.value = true;
   generatedRequests.value = [];
   const config = buildConfig();
 
-  // Preview the generated requests first so the operator can sanity-check
-  // them; this is best-effort and never blocks the attack from starting.
-  generatedRequests.value = await generatePreview({
-    template: template.value,
-    config,
-  });
+  try {
+    // Preview the generated requests first so the operator can sanity-check
+    // them; this is best-effort and never blocks the attack from starting.
+    generatedRequests.value = await generatePreview({
+      template: template.value,
+      config,
+    });
 
-  await startIntruderAttack({ template: template.value, config });
+    await startIntruderAttack({ template: template.value, config });
+  } finally {
+    starting.value = false;
+  }
 };
 
 const stopAttack = async () => {
@@ -349,17 +366,17 @@ const decodeBody = (bytes: number[] | undefined): string => {
 // drop §markers§ into the fields they want to fuzz.
 const buildTemplate = (entry: CaptureEntry): string => {
   const req = entry.request;
-  let path = req.url;
+  // Keep the absolute URL (scheme + host + path) in the request line. The
+  // backend sends probes using that URL directly and does not rebuild the
+  // destination from the Host header.
   let host = '';
   try {
-    const parsed = new URL(req.url);
-    path = `${parsed.pathname}${parsed.search}`;
-    host = parsed.host;
+    host = new URL(req.url).host;
   } catch {
-    // Relative or unparseable URL; keep the raw value in the request line.
+    // Relative or unparseable URL; still use the raw value in the request line.
   }
 
-  const lines = [`${req.method} ${path} HTTP/1.1`];
+  const lines = [`${req.method} ${req.url} HTTP/1.1`];
   const hasHost = req.headers.some(([name]) => name.toLowerCase() === 'host');
   if (host && !hasHost) {
     lines.push(`Host: ${host}`);
@@ -900,5 +917,28 @@ h3 {
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.3);
   border-color: #f87171;
+}
+
+.error-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 0, 110, 0.1);
+  border: 1px solid rgba(255, 0, 110, 0.3);
+  border-radius: 6px;
+  color: #ff6b9d;
+}
+
+.error-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.error-message {
+  flex: 1;
+  font-size: 0.9rem;
+  word-break: break-word;
 }
 </style>
