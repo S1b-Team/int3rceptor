@@ -130,8 +130,14 @@ class INT3RCEPTORClient {
         } catch (error) {
             console.error("Failed to fetch WebSocket stats:", error);
             return {
-                connections: 0,
-                frames: 0,
+                active_connections: 0,
+                total_connections: 0,
+                total_frames: 0,
+                text_frames: 0,
+                binary_frames: 0,
+                control_frames: 0,
+                total_bytes: 0,
+                frames_by_connection: {},
             };
         }
     }

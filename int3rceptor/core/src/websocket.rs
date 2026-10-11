@@ -1,5 +1,6 @@
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use time::OffsetDateTime;
 
@@ -208,6 +209,56 @@ impl WsCapture {
         self.frames.write().clear();
     }
 
+
+    /// Aggregate stats matching the UI `WebSocketStats` contract.
+    pub fn get_stats(&self) -> WsStats {
+        // Lock order must match `capture_frame` (frames, then connections).
+        let frames = self.frames.read();
+        let connections = self.connections.read();
+
+        let active_connections = connections.iter().filter(|c| c.closed_at.is_none()).count();
+        let total_connections = connections.len();
+        let total_frames = frames.len();
+
+        let mut text_frames = 0usize;
+        let mut binary_frames = 0usize;
+        let mut control_frames = 0usize;
+        let mut total_bytes = 0usize;
+        let mut frames_by_connection: HashMap<String, usize> = HashMap::new();
+
+        for frame in frames.iter() {
+            total_bytes += frame.payload.len();
+            *frames_by_connection
+                .entry(frame.connection_id.clone())
+                .or_insert(0) += 1;
+            match frame.frame_type {
+                WsFrameType::Text => text_frames += 1,
+                WsFrameType::Binary => binary_frames += 1,
+                WsFrameType::Ping | WsFrameType::Pong | WsFrameType::Close => {
+                    control_frames += 1
+                }
+            }
+        }
+
+        // Include registered connections that have not produced frames yet.
+        for conn in connections.iter() {
+            frames_by_connection
+                .entry(conn.id.clone())
+                .or_insert(0);
+        }
+
+        WsStats {
+            active_connections,
+            total_connections,
+            total_frames,
+            text_frames,
+            binary_frames,
+            control_frames,
+            total_bytes,
+            frames_by_connection,
+        }
+    }
+
     /// P4: Get memory usage statistics
     pub fn get_memory_stats(&self) -> WsMemoryStats {
         let frames = self.frames.read();
@@ -248,6 +299,20 @@ impl Default for WsCapture {
     fn default() -> Self {
         Self::new(10_000) // Default: 10k frames
     }
+}
+
+
+/// Aggregate WebSocket capture statistics (API / UI contract)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WsStats {
+    pub active_connections: usize,
+    pub total_connections: usize,
+    pub total_frames: usize,
+    pub text_frames: usize,
+    pub binary_frames: usize,
+    pub control_frames: usize,
+    pub total_bytes: usize,
+    pub frames_by_connection: HashMap<String, usize>,
 }
 
 /// P4: WebSocket memory statistics
@@ -398,5 +463,61 @@ mod tests {
         // Verify masking is symmetric
         let remasked = WsFrameParser::mask_payload(&unmasked, &mask);
         assert_eq!(remasked, payload);
+    }
+
+    #[test]
+    fn test_ws_stats_contract() {
+        let capture = WsCapture::new(100);
+        let idle = capture.get_stats();
+        assert_eq!(idle.active_connections, 0);
+        assert_eq!(idle.total_connections, 0);
+        assert_eq!(idle.total_frames, 0);
+        assert_eq!(idle.text_frames, 0);
+        assert_eq!(idle.binary_frames, 0);
+        assert_eq!(idle.control_frames, 0);
+        assert_eq!(idle.total_bytes, 0);
+        assert!(idle.frames_by_connection.is_empty());
+
+        capture.register_connection("c1".to_string(), "wss://example.com/ws".to_string());
+        capture.register_connection("c2".to_string(), "wss://example.com/ws2".to_string());
+        capture
+            .capture_frame(
+                "c1".to_string(),
+                WsDirection::ClientToServer,
+                WsFrameType::Text,
+                b"hello".to_vec(),
+                true,
+            )
+            .expect("text frame");
+        capture
+            .capture_frame(
+                "c1".to_string(),
+                WsDirection::ServerToClient,
+                WsFrameType::Binary,
+                vec![1, 2, 3],
+                false,
+            )
+            .expect("binary frame");
+        capture
+            .capture_frame(
+                "c2".to_string(),
+                WsDirection::ClientToServer,
+                WsFrameType::Ping,
+                vec![],
+                true,
+            )
+            .expect("ping frame");
+        capture.close_connection("c2");
+
+        let stats = capture.get_stats();
+        assert_eq!(stats.active_connections, 1);
+        assert_eq!(stats.total_connections, 2);
+        assert_eq!(stats.total_frames, 3);
+        assert_eq!(stats.text_frames, 1);
+        assert_eq!(stats.binary_frames, 1);
+        assert_eq!(stats.control_frames, 1);
+        assert_eq!(stats.total_bytes, 8);
+        assert_eq!(stats.frames_by_connection.get("c1"), Some(&2));
+        assert_eq!(stats.frames_by_connection.get("c2"), Some(&1));
     }
 }
