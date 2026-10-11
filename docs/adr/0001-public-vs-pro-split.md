@@ -43,6 +43,34 @@ impl. Under the Cargo feature `pro`, those resolvers call hooks in
 `intruder::extension::pro_extension`, which int3rceptor-pro wires to premium
 modules. Without that feature, behavior is unchanged.
 
+## Security & Governance
+
+Two more rules keep the split safe to operate:
+
+4. **Secret management.** Premium signing keys move from hex strings
+   stored in a repository to an HSM or a managed KMS. The public
+   repository only ever contains the public verifying key. Any key that
+   was previously tracked in git history, even in the private repo, is
+   treated as compromised long-term and is rotated as part of this split.
+
+5. **CI/CD and seam integrity.** Community PRs must not be able to break
+   the Pro extension points:
+   - CI runs two pipelines: `default` (public) and `--features pro`, the
+     latter on a private runner with access to the Pro workspace.
+   - `core/src/intruder/extension.rs` and the feature-gate section of
+     `core/Cargo.toml` are under strict CODEOWNERS review.
+   - The Pro feature gate fails closed in production builds. Falling back
+     to the public impls exists only for development ergonomics and local
+     compilation; it is never a licensing path.
+
+## Pro build requirements
+
+Sensitive Pro trait impls must be marked `#[inline(never)]`, so that LTO
+or `opt-level = "z"` cannot fuse Pro logic into functions that look public
+in the compiled binary. This is a non-functional security requirement, not
+a performance tweak. The rule is stated here in the public ADR, but it is
+enforced in the int3rceptor-pro tree.
+
 ## Consequences
 
 - A normal `cargo build` / `cargo test` in this repo stays green and
@@ -54,3 +82,7 @@ modules. Without that feature, behavior is unchanged.
   int3rceptor-pro workspace.
 - API routes that serve built-in payloads go through the resolver so Pro
   can swap sources without touching the route layer.
+- Governance: community contributors stay productive without Pro source,
+  and the public tree remains the source of truth for engine behavior.
+- Security: moving secrets to a KMS reduces the blast radius of a
+  compromise of int3rceptor-pro.
