@@ -21,9 +21,10 @@ Three rules govern the split:
    build. We do not empty the public Intruder to make room for Pro.
 
 2. **Premium stays private.** Premium payloads, strategies, and detection
-   rules, NOWARU / VOIDWALKER wiring, and the signing key live only in the
-   int3rceptor-pro repository. Nothing premium is checked into the public
-   tree.
+   rules, NOWARU / VOIDWALKER wiring, and signing-key material and access
+   are governed by the private int3rceptor-pro side, covering CI/CD secret
+   access and HSM/KMS integration; cryptographic material never touches the
+   public tree. Nothing premium is checked into the public tree.
 
 3. **Next work fills Pro, then cleans licenses.** Follow-up is license
    cleanup and filling the Pro placeholders — not stripping features from
