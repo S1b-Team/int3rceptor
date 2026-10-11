@@ -212,8 +212,9 @@ impl WsCapture {
 
     /// Aggregate stats matching the UI `WebSocketStats` contract.
     pub fn get_stats(&self) -> WsStats {
-        let connections = self.connections.read();
+        // Lock order must match `capture_frame` (frames, then connections).
         let frames = self.frames.read();
+        let connections = self.connections.read();
 
         let active_connections = connections.iter().filter(|c| c.closed_at.is_none()).count();
         let total_connections = connections.len();
