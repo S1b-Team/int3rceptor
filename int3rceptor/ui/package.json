@@ -12,7 +12,7 @@
   "dependencies": {
     "@sentry/browser": "^7.119.0",
     "@sentry/tracing": "^7.119.0",
-    "axios": "^1.13.5",
+    "axios": "^1.20.0",
     "highlight.js": "^11.11.1",
     "vue": "^3.4.0"
   },
