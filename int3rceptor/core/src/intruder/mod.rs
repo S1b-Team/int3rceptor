@@ -8,6 +8,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
+mod extension;
+
+pub use extension::{
+    active_payloads, resolve_attack_strategy, resolve_payload_source, AttackStrategy,
+    CommonPayloadSource, PayloadSource, PublicAttackStrategy,
+};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntruderConfig {
     pub positions: Vec<IntruderPosition>,
@@ -224,129 +231,17 @@ impl Intruder {
         }
     }
 
-    /// Generate requests with their associated payloads
-    /// Returns Vec<(request_string, payload_used)>
+    /// Generate requests with their associated payloads.
+    ///
+    /// Delegates to [`resolve_attack_strategy`] so the public engine stays
+    /// the default while the `pro` feature can plug in premium strategies.
+    /// Returns `Vec<(request_string, payload_used)>`.
     pub fn generate_requests(
         &self,
         template: &str,
         config: &IntruderConfig,
     ) -> Result<Vec<(String, String)>> {
-        match config.attack_type {
-            AttackType::Sniper => self.generate_sniper(template, config),
-            AttackType::Battering => self.generate_battering(template, config),
-            AttackType::Pitchfork => self.generate_pitchfork(template, config),
-            AttackType::ClusterBomb => self.generate_cluster_bomb(template, config),
-        }
-    }
-
-    fn generate_sniper(
-        &self,
-        template: &str,
-        config: &IntruderConfig,
-    ) -> Result<Vec<(String, String)>> {
-        let mut requests = Vec::new();
-
-        for payload in &config.payloads {
-            for position in &config.positions {
-                let mut modified = template.to_string();
-                let marker = format!("§{}§", position.name);
-                modified = modified.replace(&marker, payload);
-
-                // Replace other markers with empty string
-                for other_pos in &config.positions {
-                    if other_pos.name != position.name {
-                        let other_marker = format!("§{}§", other_pos.name);
-                        modified = modified.replace(&other_marker, "");
-                    }
-                }
-
-                requests.push((modified, payload.clone()));
-            }
-        }
-
-        Ok(requests)
-    }
-
-    fn generate_battering(
-        &self,
-        template: &str,
-        config: &IntruderConfig,
-    ) -> Result<Vec<(String, String)>> {
-        let mut requests = Vec::new();
-
-        for payload in &config.payloads {
-            let mut modified = template.to_string();
-
-            for position in &config.positions {
-                let marker = format!("§{}§", position.name);
-                modified = modified.replace(&marker, payload);
-            }
-
-            requests.push((modified, payload.clone()));
-        }
-
-        Ok(requests)
-    }
-
-    fn generate_pitchfork(
-        &self,
-        template: &str,
-        config: &IntruderConfig,
-    ) -> Result<Vec<(String, String)>> {
-        let mut requests = Vec::new();
-        let payload_count = config.payloads.len();
-        let empty_string = String::new();
-
-        for i in 0..payload_count {
-            let mut modified = template.to_string();
-            let mut used_payloads = Vec::new();
-
-            for position in config.positions.iter() {
-                let marker = format!("§{}§", position.name);
-                let payload = config.payloads.get(i).unwrap_or(&empty_string);
-                modified = modified.replace(&marker, payload);
-                used_payloads.push(payload.clone());
-            }
-
-            requests.push((modified, used_payloads.join(", ")));
-        }
-
-        Ok(requests)
-    }
-
-    fn generate_cluster_bomb(
-        &self,
-        template: &str,
-        config: &IntruderConfig,
-    ) -> Result<Vec<(String, String)>> {
-        let mut requests = Vec::new();
-        let position_count = config.positions.len();
-
-        if position_count == 0 {
-            return Ok(requests);
-        }
-
-        // Generate all combinations
-        let total_combinations = config.payloads.len().pow(position_count as u32);
-
-        for i in 0..total_combinations {
-            let mut modified = template.to_string();
-            let mut combination_index = i;
-            let mut used_payloads = Vec::new();
-
-            for position in &config.positions {
-                let payload_index = combination_index % config.payloads.len();
-                let payload = &config.payloads[payload_index];
-                let marker = format!("§{}§", position.name);
-                modified = modified.replace(&marker, payload);
-                used_payloads.push(payload.clone());
-                combination_index /= config.payloads.len();
-            }
-
-            requests.push((modified, used_payloads.join(", ")));
-        }
-
-        Ok(requests)
+        resolve_attack_strategy().generate(template, config)
     }
 
     pub fn add_result(&self, result: IntruderResult) {
@@ -406,28 +301,11 @@ fn parse_request(raw: &str) -> Result<Request<ProxyBody>> {
 /// a few common account names, and an over-long string. They are deliberately
 /// not exploit strings; this is a defensive testing tool, so building a real
 /// attack wordlist is left to the operator.
+///
+/// Equivalent to [`CommonPayloadSource::payloads`]. Callers that should honor
+/// the `pro` extension hook should use [`resolve_payload_source`] instead.
 pub fn common_payloads() -> Vec<String> {
-    [
-        "",
-        "0",
-        "1",
-        "-1",
-        "true",
-        "false",
-        "null",
-        "admin",
-        "test",
-        "guest",
-        "user",
-        "2147483647",
-        "-2147483648",
-        "99999999999999999999",
-        "          ",
-        &"A".repeat(256),
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect()
+    CommonPayloadSource.payloads()
 }
 
 impl Default for Intruder {

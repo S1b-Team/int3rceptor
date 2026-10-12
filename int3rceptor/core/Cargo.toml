@@ -56,10 +56,16 @@ similar = "2.7.0"
 
 [features]
 default = []
+# Enables Intruder / scanner extension hooks that int3rceptor-pro fills in.
+# Building with `--features pro` in this public checkout keeps the public
+# fallbacks (see intruder::extension::pro_extension). The commercial product
+# is built from the int3rceptor-pro workspace, where the private crate is
+# present and wired in.
 pro = []
 
-# [target.'cfg(feature = "pro")'.dependencies]
-# core-pro = { path = "../core-pro", package = "int3rceptor-pro" }
+# Optional private crate — only available in the int3rceptor-pro checkout:
+# core-pro = { path = "../core-pro", package = "int3rceptor-pro", optional = true }
+# Then: pro = ["dep:core-pro"]
 
 [dev-dependencies]
 tempfile = "3.10"
