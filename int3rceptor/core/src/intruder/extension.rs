@@ -218,10 +218,10 @@ pub fn resolve_attack_strategy() -> Box<dyn AttackStrategy> {
 /// Pro-feature hooks for premium Intruder intelligence.
 ///
 /// int3rceptor-pro owns the real premium payload sources and strategies.
-/// In this public checkout the hooks keep the built-in implementations so
-/// `cargo check -p interceptor-core --features pro` still compiles without
-/// the private crate on the path. The pro workspace replaces or overlays
-/// these hooks when building the commercial product.
+/// In this public checkout the hooks keep the built-in implementations.
+/// The full `--features pro` build still requires the private `core-pro`
+/// files and dependency wiring used by the scanner. The pro workspace
+/// replaces or overlays these hooks when building the commercial product.
 #[cfg(feature = "pro")]
 pub mod pro_extension {
     use super::{AttackStrategy, CommonPayloadSource, PayloadSource, PublicAttackStrategy};
@@ -246,12 +246,33 @@ mod tests {
 
     #[test]
     fn common_payload_source_matches_legacy_helper() {
-        let via_trait = CommonPayloadSource.payloads();
-        let via_helper = crate::intruder::common_payloads();
-        assert_eq!(via_trait, via_helper);
-        assert!(!via_trait.is_empty());
+        let expected: Vec<String> = [
+            "",
+            "0",
+            "1",
+            "-1",
+            "true",
+            "false",
+            "null",
+            "admin",
+            "test",
+            "guest",
+            "user",
+            "2147483647",
+            "-2147483648",
+            "99999999999999999999",
+            "          ",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .chain(std::iter::once("A".repeat(256)))
+        .collect();
+
+        assert_eq!(CommonPayloadSource.payloads(), expected);
+        assert_eq!(crate::intruder::common_payloads(), expected);
     }
 
+    #[cfg(not(feature = "pro"))]
     #[test]
     fn resolve_defaults_to_public_impls() {
         let payloads = resolve_payload_source().payloads();
