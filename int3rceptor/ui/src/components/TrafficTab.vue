@@ -6,6 +6,7 @@
  * websocket feed. This component renders the filter bar, the request
  * table, the details panel and the repeater.
  */
+import { computed } from "vue";
 import RequestDetail from "./RequestDetail.vue";
 import RepeaterTab from "./RepeaterTab.vue";
 import type { CaptureEntry } from "@/types";
@@ -33,6 +34,41 @@ const emit = defineEmits<{
     "update:filters": [TrafficFilters];
     export: [ExportFormat];
 }>();
+
+const EXPORT_FORMATS: ExportFormat[] = ["json", "csv", "har"];
+
+// Parse each URL once per items change instead of twice per row render.
+const rows = computed(() =>
+    props.items.map((entry) => ({ entry, ...parseUrl(entry.request.url) }))
+);
+
+// Roving tabindex: only one row is in the tab order (the selected one,
+// or the first row when nothing is selected); arrow keys move between rows.
+const tabbableId = computed(() => {
+    const ids = props.items.map((e) => e.request.id);
+    if (props.selectedId !== null && ids.includes(props.selectedId)) {
+        return props.selectedId;
+    }
+    return ids[0] ?? null;
+});
+
+function onRowKeydown(event: KeyboardEvent, index: number) {
+    let next = index;
+    if (event.key === "ArrowDown") next = Math.min(index + 1, props.items.length - 1);
+    else if (event.key === "ArrowUp") next = Math.max(index - 1, 0);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = props.items.length - 1;
+    else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        emit("select", props.items[index].request.id);
+        return;
+    } else return;
+    event.preventDefault();
+    if (next === index) return;
+    emit("select", props.items[next].request.id);
+    const tbody = (event.currentTarget as HTMLElement).parentElement;
+    (tbody?.children[next] as HTMLElement | undefined)?.focus();
+}
 
 function setFilter<K extends keyof TrafficFilters>(
     key: K,
@@ -143,7 +179,7 @@ function statusClass(code: number): string {
                 <label>Export</label>
                 <div class="export-buttons">
                     <button
-                        v-for="fmt in (['json', 'csv', 'har'] as ExportFormat[])"
+                        v-for="fmt in EXPORT_FORMATS"
                         :key="fmt"
                         class="ghost"
                         :disabled="exporting"
@@ -157,7 +193,7 @@ function statusClass(code: number): string {
 
         <div class="traffic-content">
             <div class="transaction-list">
-                <table class="traffic-table">
+                <table class="traffic-table" role="grid" aria-label="Captured requests">
                     <thead>
                         <tr>
                             <th class="col-id">#</th>
@@ -172,43 +208,44 @@ function statusClass(code: number): string {
                     </thead>
                     <tbody>
                         <tr
-                            v-for="entry in items"
-                            :key="entry.request.id"
-                            :class="{ selected: entry.request.id === selectedId }"
-                            tabindex="0"
-                            @click="emit('select', entry.request.id)"
-                            @keydown.enter="emit('select', entry.request.id)"
+                            v-for="(row, index) in rows"
+                            :key="row.entry.request.id"
+                            :class="{ selected: row.entry.request.id === selectedId }"
+                            :aria-selected="row.entry.request.id === selectedId"
+                            :tabindex="row.entry.request.id === tabbableId ? 0 : -1"
+                            @click="emit('select', row.entry.request.id)"
+                            @keydown="onRowKeydown($event, index)"
                         >
-                            <td class="col-id">{{ entry.request.id }}</td>
+                            <td class="col-id">{{ row.entry.request.id }}</td>
                             <td class="col-time">
-                                {{ formatTime(entry.request.timestamp_ms) }}
+                                {{ formatTime(row.entry.request.timestamp_ms) }}
                             </td>
                             <td class="col-method">
-                                <span :class="['pill', methodClass(entry.request.method)]">
-                                    {{ entry.request.method }}
+                                <span :class="['pill', methodClass(row.entry.request.method)]">
+                                    {{ row.entry.request.method }}
                                 </span>
                             </td>
                             <td class="col-host">
-                                <span v-if="entry.request.tls" class="tls" title="HTTPS">🔒</span>
-                                {{ parseUrl(entry.request.url).host }}
+                                <span v-if="row.entry.request.tls" class="tls" title="HTTPS">🔒</span>
+                                {{ row.host }}
                             </td>
-                            <td class="col-path" :title="entry.request.url">
-                                {{ parseUrl(entry.request.url).path }}
+                            <td class="col-path" :title="row.entry.request.url">
+                                {{ row.path }}
                             </td>
                             <td class="col-status">
                                 <span
-                                    v-if="entry.response"
-                                    :class="['pill', statusClass(entry.response.status_code)]"
+                                    v-if="row.entry.response"
+                                    :class="['pill', statusClass(row.entry.response.status_code)]"
                                 >
-                                    {{ entry.response.status_code }}
+                                    {{ row.entry.response.status_code }}
                                 </span>
                                 <span v-else class="pending">…</span>
                             </td>
                             <td class="col-size">
-                                {{ entry.response ? formatSize(entry.response.body.length) : "-" }}
+                                {{ row.entry.response ? formatSize(row.entry.response.body.length) : "-" }}
                             </td>
                             <td class="col-duration">
-                                {{ entry.response ? `${entry.response.duration_ms} ms` : "-" }}
+                                {{ row.entry.response ? `${row.entry.response.duration_ms} ms` : "-" }}
                             </td>
                         </tr>
                         <tr v-if="!items.length" class="empty-row">
