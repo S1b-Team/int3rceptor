@@ -235,13 +235,15 @@ function exitCompareMode() {
 // Format timestamp
 function formatTime(timestamp: string): string {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString("en-US", {
+    // fractionalSecondDigits is ES2021; tsconfig targets ES2020 libs.
+    const options = {
         hour12: false,
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
         fractionalSecondDigits: 3,
-    });
+    } as Intl.DateTimeFormatOptions;
+    return date.toLocaleTimeString("en-US", options);
 }
 
 // Get direction icon
