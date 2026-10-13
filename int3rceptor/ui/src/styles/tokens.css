@@ -37,6 +37,21 @@
   --color-status-error: #ef4444;
   --color-status-info: #3b82f6;
 
+  /* HTTP badges (UI_DESIGN_SPEC: Badges) */
+  --color-method-get: #00d4ff;
+  --color-method-post: #ff006e;
+  --color-method-put: #ffb800;
+  --color-method-delete: #ff0000;
+  --color-method-other: #8b5cf6;
+  --color-http-2xx: #00d4ff;
+  --color-http-3xx: #8b5cf6;
+  --color-http-4xx: #ff006e;
+  --color-http-5xx: #ff4500;
+
+  /* Table rows */
+  --color-row-alt: #1a1a2e;
+  --color-row-selected: #1a2a3e;
+
   /* ========================================
      TYPOGRAPHY
      ======================================== */
