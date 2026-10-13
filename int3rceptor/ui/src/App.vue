@@ -405,7 +405,8 @@ button {
     font-family: var(--font-sans);
     font-weight: var(--font-weight-semibold);
     transition: box-shadow var(--transition-fast),
-        background var(--transition-fast);
+        background var(--transition-fast),
+        color var(--transition-fast);
 }
 
 button:hover:not(:disabled) {
@@ -458,7 +459,8 @@ button:disabled {
 
 .filters input:focus,
 .filters select:focus {
-    outline: none;
+    outline: 2px solid var(--color-border-active);
+    outline-offset: 1px;
     border-color: var(--color-border-active);
 }
 
