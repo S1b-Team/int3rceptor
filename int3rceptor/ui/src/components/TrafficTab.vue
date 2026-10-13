@@ -53,17 +53,21 @@ const tabbableId = computed(() => {
 });
 
 function onRowKeydown(event: KeyboardEvent, index: number) {
-    let next = index;
-    if (event.key === "ArrowDown") next = Math.min(index + 1, props.items.length - 1);
-    else if (event.key === "ArrowUp") next = Math.max(index - 1, 0);
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = props.items.length - 1;
-    else if (event.key === "Enter" || event.key === " ") {
+    if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         emit("select", props.items[index].request.id);
         return;
-    } else return;
+    }
+    const last = props.items.length - 1;
+    const targets: Record<string, number> = {
+        ArrowDown: Math.min(index + 1, last),
+        ArrowUp: Math.max(index - 1, 0),
+        Home: 0,
+        End: last,
+    };
+    if (!(event.key in targets)) return;
     event.preventDefault();
+    const next = targets[event.key];
     if (next === index) return;
     emit("select", props.items[next].request.id);
     const tbody = (event.currentTarget as HTMLElement).parentElement;
