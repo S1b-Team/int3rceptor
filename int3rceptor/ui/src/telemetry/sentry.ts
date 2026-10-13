@@ -35,7 +35,7 @@ export function initSentry() {
       if (event.request) {
         event.request.url = "[REDACTED_URL]";
         event.request.headers = { redacted: "true" } as any;
-        event.request.cookies = "[REDACTED]";
+        event.request.cookies = { redacted: "true" };
         (event.request as any).data = undefined;
       }
       if (event.extra) {

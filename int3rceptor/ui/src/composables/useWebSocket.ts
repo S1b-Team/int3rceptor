@@ -1,14 +1,15 @@
 /**
  * useWebSocket Composable
  *
- * Manages WebSocket connections for real-time dashboard updates.
- * - Supports multiple channels: metrics, activity, health, connections
+ * Manages the WebSocket connection to the backend `/ws` stream.
+ * - Exposes `connected` and the latest captured request (`latest`)
+ * - Supports channels: request, hello, metrics, activity, health, connections
  * - Automatic reconnection with exponential backoff
  * - Message parsing and type-safe event handling
  * - Fallback to polling if WebSocket unavailable
  *
  * @example
- * const { isConnected, subscribe, unsubscribe } = useWebSocket();
+ * const { connected, latest, subscribe } = useWebSocket("ws://127.0.0.1:3000/ws");
  * subscribe('metrics', (data: SystemMetrics) => {
  *   console.log('New metrics:', data);
  * });
@@ -21,19 +22,12 @@ import {
     type Ref,
     type ComputedRef,
 } from "vue";
-import type {
-    SystemMetrics,
-    ActivityEntry,
-    HealthStatus,
-    ConnectionStats,
-} from "@/types/dashboard";
+import type { CaptureEntry } from "@/types";
 
 // ==========================================
 // Configuration Constants
 // ==========================================
 
-/** WebSocket reconnection attempt max count */
-const MAX_RECONNECT_ATTEMPTS = 5;
 
 /** Initial reconnection delay in milliseconds */
 const INITIAL_RECONNECT_DELAY = 1000;
@@ -41,8 +35,6 @@ const INITIAL_RECONNECT_DELAY = 1000;
 /** Maximum reconnection delay in milliseconds */
 const MAX_RECONNECT_DELAY = 30000;
 
-/** WebSocket message timeout in milliseconds */
-const MESSAGE_TIMEOUT_MS = 10000;
 
 // ==========================================
 // Type Definitions
@@ -55,7 +47,7 @@ interface WebSocketMessage<T = unknown> {
     type: string;
     channel?: string;
     data: T;
-    timestamp: number;
+    timestamp?: number;
     id?: string;
 }
 
@@ -68,6 +60,8 @@ type ChannelCallback<T> = (data: T, message?: WebSocketMessage<T>) => void;
  * Supported WebSocket channels
  */
 export type WebSocketChannel =
+    | "request"
+    | "hello"
     | "metrics"
     | "activity"
     | "health"
@@ -76,8 +70,13 @@ export type WebSocketChannel =
 /**
  * Return type for useWebSocket
  */
-interface UseWebSocketReturn {
+export interface UseWebSocketReturn {
+    /** True while the socket is open */
+    connected: ComputedRef<boolean>;
+    /** Alias of `connected`, kept for existing callers */
     isConnected: ComputedRef<boolean>;
+    /** Most recent captured request pushed by the backend */
+    latest: Ref<CaptureEntry | null>;
     reconnectAttempts: Ref<number>;
     lastMessageTime: Ref<number>;
     timeSinceLastMessage: ComputedRef<number>;
@@ -111,7 +110,7 @@ interface UseWebSocketReturn {
  *
  * @returns {UseWebSocketReturn} WebSocket connection state and methods
  */
-export function useWebSocket(): UseWebSocketReturn {
+export function useWebSocket(url?: string): UseWebSocketReturn {
     // ==========================================
     // State
     // ==========================================
@@ -125,12 +124,17 @@ export function useWebSocket(): UseWebSocketReturn {
     /** Current reconnection attempt count */
     const reconnectAttempts = ref(0);
 
+    /** Latest captured request received on the "request" channel */
+    const latest = ref<CaptureEntry | null>(null) as Ref<CaptureEntry | null>;
+
     /** Last message received time */
     const lastMessageTime = ref(0);
 
     /** Callbacks registered for each channel */
     const subscriptions = ref<Map<WebSocketChannel, Set<ChannelCallback<any>>>>(
         new Map([
+            ["request", new Set()],
+            ["hello", new Set()],
             ["metrics", new Set()],
             ["activity", new Set()],
             ["health", new Set()],
@@ -145,8 +149,8 @@ export function useWebSocket(): UseWebSocketReturn {
     /** Pending reconnection timeout */
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    /** Message timeout tracking */
-    let messageTimeout: ReturnType<typeof setTimeout> | null = null;
+    /** Set when disconnect() is called on purpose, to skip auto-reconnect */
+    let manualClose = false;
 
     /** Whether cleanup has been called */
     let isCleanedUp = false;
@@ -175,6 +179,7 @@ export function useWebSocket(): UseWebSocketReturn {
      * @returns WebSocket URL
      */
     const getWebSocketUrl = (): string => {
+        if (url) return url;
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const host = window.location.host;
         return `${protocol}//${host}/ws`;
@@ -205,7 +210,7 @@ export function useWebSocket(): UseWebSocketReturn {
             const parsed = JSON.parse(data);
 
             // Validate required fields
-            if (!parsed.type || !parsed.data || !parsed.timestamp) {
+            if (!parsed || typeof parsed.type !== "string" || parsed.data === undefined) {
                 console.warn(
                     "[useWebSocket] Invalid message structure:",
                     parsed,
@@ -230,6 +235,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
         // Determine channel from message type
         const channel = (message.channel || message.type) as WebSocketChannel;
+
+        if (channel === "request") {
+            latest.value = message.data as CaptureEntry;
+        }
 
         if (import.meta.env.DEV) {
             console.debug("[useWebSocket] Message received", {
@@ -279,27 +288,15 @@ export function useWebSocket(): UseWebSocketReturn {
             if (import.meta.env.DEV) {
                 console.debug("[useWebSocket] Connected");
             }
-
-            // Reset message timeout on connection
-            if (messageTimeout) {
-                clearTimeout(messageTimeout);
-            }
-            setMessageTimeout();
         };
 
         ws.onmessage = (event: MessageEvent) => {
             if (isCleanedUp) return;
 
-            // Reset message timeout on each message
-            if (messageTimeout) {
-                clearTimeout(messageTimeout);
-            }
-
             const message = parseMessage(event.data);
 
             if (message) {
                 handleMessage(message);
-                setMessageTimeout();
             }
         };
 
@@ -311,12 +308,13 @@ export function useWebSocket(): UseWebSocketReturn {
         };
 
         ws.onclose = () => {
-            if (isCleanedUp) return;
-
+            ws = null;
             isConnected.value = false;
+            if (isCleanedUp || manualClose) return;
 
-            // Attempt reconnection with exponential backoff
-            if (reconnectAttempts.value < MAX_RECONNECT_ATTEMPTS) {
+            // Keep retrying with capped exponential backoff; the proxy may
+            // simply not be running yet.
+            {
                 const delay = calculateBackoffDelay(reconnectAttempts.value);
                 reconnectAttempts.value++;
 
@@ -329,25 +327,8 @@ export function useWebSocket(): UseWebSocketReturn {
                 reconnectTimeout = setTimeout(() => {
                     connect();
                 }, delay);
-            } else {
-                console.error(
-                    "[useWebSocket] Max reconnection attempts exceeded",
-                );
             }
         };
-    };
-
-    /**
-     * Set up message timeout (close connection if no messages)
-     */
-    const setMessageTimeout = (): void => {
-        messageTimeout = setTimeout(() => {
-            if (isConnected.value) {
-                console.warn("[useWebSocket] Message timeout - reconnecting");
-                disconnect();
-                connect();
-            }
-        }, MESSAGE_TIMEOUT_MS);
     };
 
     // ==========================================
@@ -365,6 +346,11 @@ export function useWebSocket(): UseWebSocketReturn {
      */
     const connect = async (): Promise<void> => {
         // Don't reconnect if already connected or cleaned up
+        manualClose = false;
+        if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+        }
         if (ws || isConnected.value || isCleanedUp) {
             if (isConnected.value && import.meta.env.DEV) {
                 console.debug("[useWebSocket] Already connected");
@@ -373,55 +359,24 @@ export function useWebSocket(): UseWebSocketReturn {
         }
 
         try {
-            const url = getWebSocketUrl();
+            const wsUrl = getWebSocketUrl();
 
             if (import.meta.env.DEV) {
-                console.debug("[useWebSocket] Connecting to", url);
+                console.debug("[useWebSocket] Connecting to", wsUrl);
             }
 
-            ws = new WebSocket(url);
+            ws = new WebSocket(wsUrl);
             setupHandlers();
-
-            // Wait for connection to establish
-            await new Promise<void>((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error("WebSocket connection timeout"));
-                }, 5000);
-
-                const checkConnection = () => {
-                    if (isConnected.value) {
-                        clearTimeout(timeout);
-                        resolve();
-                    } else if (ws?.readyState === WebSocket.CLOSED) {
-                        clearTimeout(timeout);
-                        reject(new Error("WebSocket connection failed"));
-                    }
-                };
-
-                // Check connection state periodically
-                const interval = setInterval(() => {
-                    checkConnection();
-                    if (
-                        isConnected.value ||
-                        ws?.readyState === WebSocket.CLOSED
-                    ) {
-                        clearInterval(interval);
-                    }
-                }, 100);
-            });
         } catch (err) {
+            // Invalid URL etc. onclose won't fire, so schedule a retry here.
             console.error("[useWebSocket] Connection failed:", err);
+            ws = null;
             isConnected.value = false;
-
-            // Schedule reconnection
-            if (reconnectAttempts.value < MAX_RECONNECT_ATTEMPTS) {
-                const delay = calculateBackoffDelay(reconnectAttempts.value);
-                reconnectAttempts.value++;
-
-                reconnectTimeout = setTimeout(() => {
-                    connect();
-                }, delay);
-            }
+            const delay = calculateBackoffDelay(reconnectAttempts.value);
+            reconnectAttempts.value++;
+            reconnectTimeout = setTimeout(() => {
+                connect();
+            }, delay);
         }
     };
 
@@ -431,19 +386,16 @@ export function useWebSocket(): UseWebSocketReturn {
      * Safe to call multiple times
      */
     const disconnect = (): void => {
+        manualClose = true;
         if (reconnectTimeout) {
             clearTimeout(reconnectTimeout);
             reconnectTimeout = null;
         }
 
-        if (messageTimeout) {
-            clearTimeout(messageTimeout);
-            messageTimeout = null;
-        }
-
         if (ws) {
-            ws.close();
+            const socket = ws;
             ws = null;
+            socket.close();
         }
 
         isConnected.value = false;
@@ -540,9 +492,16 @@ export function useWebSocket(): UseWebSocketReturn {
     // Return Interface
     // ==========================================
 
+    // Start connecting right away; callers just read `connected` / `latest`.
+    void connect();
+
+    const connectedRef = computed(() => isConnected.value);
+
     return {
         // State
-        isConnected: computed(() => isConnected.value),
+        connected: connectedRef,
+        isConnected: connectedRef,
+        latest,
         reconnectAttempts,
         lastMessageTime,
         timeSinceLastMessage,
