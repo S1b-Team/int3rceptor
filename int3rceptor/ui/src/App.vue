@@ -72,79 +72,15 @@
         </nav>
 
         <template v-if="currentTab === 'traffic'">
-            <section class="filters">
-                <div>
-                    <label>Method</label>
-                    <select v-model="filterMethod">
-                        <option value="">All</option>
-                        <option>GET</option>
-                        <option>POST</option>
-                        <option>PUT</option>
-                        <option>DELETE</option>
-                        <option>PATCH</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Host</label>
-                    <input v-model="filterHost" placeholder="example.com" />
-                </div>
-                <div>
-                    <label>Status</label>
-                    <input v-model="filterStatus" placeholder="200" />
-                </div>
-                <div>
-                    <label>TLS</label>
-                    <select v-model="filterTls">
-                        <option value="all">All</option>
-                        <option value="https">HTTPS</option>
-                        <option value="http">HTTP</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Search</label>
-                    <input v-model="filterSearch" placeholder="/api" />
-                </div>
-                <div class="export">
-                    <label>Export</label>
-                    <div class="export-buttons">
-                        <button
-                            :disabled="exporting"
-                            @click="exportData('json')"
-                        >
-                            JSON
-                        </button>
-                        <button
-                            :disabled="exporting"
-                            @click="exportData('csv')"
-                        >
-                            CSV
-                        </button>
-                        <button
-                            :disabled="exporting"
-                            @click="exportData('har')"
-                        >
-                            HAR
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <main>
-                <section class="list-panel">
-                    <RequestList
-                        :items="items"
-                        :selected-id="selectedId"
-                        @select="handleSelect"
-                    />
-                </section>
-                <section class="detail-panel">
-                    <RequestDetail :entry="selectedEntry" />
-                </section>
-            </main>
-
-            <section class="repeater-panel">
-                <RepeaterTab :entry="selectedEntry" />
-            </section>
+            <TrafficTab
+                v-model:filters="filters"
+                :items="items"
+                :selected-id="selectedId"
+                :selected-entry="selectedEntry"
+                :exporting="exporting"
+                @select="handleSelect"
+                @export="exportData"
+            />
         </template>
 
         <template v-else-if="currentTab === 'rules'">
@@ -175,9 +111,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import RequestList from "./components/RequestList.vue";
-import RequestDetail from "./components/RequestDetail.vue";
-import RepeaterTab from "./components/RepeaterTab.vue";
+import TrafficTab from "./components/TrafficTab.vue";
+import type { TrafficFilters, ExportFormat } from "./components/TrafficTab.vue";
 import RulesTab from "./components/RulesTab.vue";
 import ScopeTab from "./components/ScopeTab.vue";
 import IntruderTab from "./components/IntruderTab.vue";
@@ -205,20 +140,23 @@ const currentTab = ref<
     | "dashboard"
 >("traffic");
 
-const filterMethod = ref("");
-const filterHost = ref("");
-const filterStatus = ref("");
-const filterTls = ref("all");
-const filterSearch = ref("");
+const filters = ref<TrafficFilters>({
+    method: "",
+    host: "",
+    status: "",
+    tls: "all",
+    search: "",
+});
 
 const filterParams = computed(() => {
+    const f = filters.value;
     const params: Record<string, string> = {};
-    if (filterMethod.value) params.method = filterMethod.value;
-    if (filterHost.value) params.host = filterHost.value;
-    if (filterStatus.value) params.status = filterStatus.value;
-    if (filterTls.value === "https") params.tls = "true";
-    if (filterTls.value === "http") params.tls = "false";
-    if (filterSearch.value) params.search = filterSearch.value;
+    if (f.method) params.method = f.method;
+    if (f.host) params.host = f.host;
+    if (f.status) params.status = f.status;
+    if (f.tls === "https") params.tls = "true";
+    if (f.tls === "http") params.tls = "false";
+    if (f.search) params.search = f.search;
     return params;
 });
 
@@ -271,7 +209,7 @@ watch(filterParams, () => {
     refresh();
 });
 
-const exportData = async (format: "json" | "csv" | "har") => {
+const exportData = async (format: ExportFormat) => {
     exporting.value = true;
     try {
         const blob = await exportRequests(format, filterParams.value);
@@ -426,74 +364,6 @@ button:disabled {
 
 .secondary:hover:not(:disabled) {
     background: rgba(0, 212, 255, 0.1);
-}
-
-/* ---------- Traffic filters (unchanged layout) ---------- */
-.filters {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: var(--spacing-md);
-    padding: var(--spacing-md) var(--spacing-xl);
-}
-
-.filters label {
-    display: block;
-    font-size: var(--font-size-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
-    margin-bottom: var(--spacing-xs);
-}
-
-.filters input,
-.filters select {
-    width: 100%;
-    box-sizing: border-box;
-    background: var(--color-bg-secondary);
-    border: var(--border-width-thin) solid var(--color-border-default);
-    border-radius: var(--border-radius-sm);
-    padding: 6px var(--spacing-sm);
-    color: var(--color-text-primary);
-    transition: border-color var(--transition-fast);
-}
-
-.filters input:focus,
-.filters select:focus {
-    outline: 2px solid var(--color-border-active);
-    outline-offset: 1px;
-    border-color: var(--color-border-active);
-}
-
-.export {
-    display: flex;
-    flex-direction: column;
-}
-
-.export-buttons {
-    display: flex;
-    gap: 6px;
-}
-
-main {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    flex: 1;
-    min-height: 0;
-}
-
-.list-panel,
-.detail-panel,
-.repeater-panel {
-    border-top: var(--border-width-thin) solid var(--color-border-default);
-}
-
-.list-panel,
-.detail-panel {
-    overflow: hidden;
-}
-
-.repeater-panel {
-    padding: var(--spacing-md);
 }
 
 /* ---------- Status pill ---------- */
