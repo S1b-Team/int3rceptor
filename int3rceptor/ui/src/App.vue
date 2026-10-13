@@ -1,7 +1,7 @@
 <template>
     <div class="app-shell">
         <header>
-            <h1>Interceptor</h1>
+            <h1 class="brand">Int3rceptor</h1>
             <div class="status-bar">
                 <span :class="['pill', ws.connected ? 'ok' : 'warn']">
                     WS {{ ws.connected ? "Connected" : "Disconnected" }}
@@ -15,7 +15,7 @@
 
         <div class="ca-tip">
             <div>
-                <strong>Install the Interceptor CA</strong>
+                <strong>Install the Int3rceptor CA</strong>
                 <p>
                     Run
                     <code>interceptor --export-ca ./interceptor-ca.pem</code>
@@ -291,76 +291,177 @@ const exportData = async (format: "json" | "csv" | "har") => {
 
 <style scoped>
 .app-shell {
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
+    font-family: var(--font-sans);
     min-height: 100vh;
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
     display: flex;
     flex-direction: column;
 }
 
-.main-nav {
-    display: flex;
-    gap: 1rem;
-    padding: 0.5rem 2rem;
-    background: rgba(15, 23, 42, 0.95);
-    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.main-nav button {
-    background: transparent;
-    color: #94a3b8;
-    border: 1px solid transparent;
-    padding: 0.4rem 1rem;
-    cursor: pointer;
-    font-weight: 600;
-    border-radius: 4px;
-}
-
-.main-nav button.active {
-    background: rgba(56, 189, 248, 0.1);
-    color: #38bdf8;
-    border-color: rgba(56, 189, 248, 0.3);
-}
-
+/* ---------- Header ---------- */
 header {
-    padding: 1rem 2rem;
+    height: 60px;
+    box-sizing: border-box;
+    padding: 0 var(--spacing-xl);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+    background: var(--color-bg-secondary);
+    border-bottom: var(--border-width-thin) solid var(--color-border-default);
+}
+
+.brand {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent-cyan);
+    text-shadow: var(--shadow-cyan);
 }
 
 .status-bar {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
     align-items: center;
 }
 
+/* ---------- Navigation ---------- */
+.main-nav {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: 0 var(--spacing-xl);
+    background: var(--color-bg-primary);
+    border-bottom: var(--border-width-thin) solid var(--color-border-default);
+}
+
+.main-nav button {
+    background: transparent;
+    color: var(--color-text-secondary);
+    border: none;
+    border-bottom: var(--border-width-medium) solid transparent;
+    border-radius: 0;
+    padding: var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) - 2px);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.02em;
+    box-shadow: none;
+    transition: color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+
+.main-nav button:hover:not(.active) {
+    color: var(--color-text-primary);
+    box-shadow: none;
+}
+
+.main-nav button.active {
+    color: var(--color-accent-cyan);
+    border-bottom-color: var(--color-accent-cyan);
+}
+
+/* ---------- CA tip ---------- */
+.ca-tip {
+    margin: var(--spacing-md) var(--spacing-xl);
+    padding: var(--spacing-md);
+    background: var(--color-bg-soft);
+    border: var(--border-width-thin) solid var(--color-border-default);
+    border-left: var(--border-width-thick) solid var(--color-accent-orange);
+    border-radius: var(--border-radius-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.ca-tip strong {
+    color: var(--color-accent-orange);
+}
+
+.ca-tip p {
+    margin: var(--spacing-xs) 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.ca-tip code {
+    color: var(--color-accent-cyan);
+    background: var(--color-bg-primary);
+    padding: 1px 6px;
+    border-radius: var(--border-radius-sm);
+}
+
+/* ---------- Buttons ---------- */
+button {
+    background: var(--color-accent-cyan);
+    color: var(--color-bg-primary);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-weight: var(--font-weight-semibold);
+    transition: box-shadow var(--transition-fast),
+        background var(--transition-fast),
+        color var(--transition-fast);
+}
+
+button:hover:not(:disabled) {
+    box-shadow: var(--shadow-cyan-lg);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary {
+    background: transparent;
+    border: var(--border-width-thin) solid var(--color-accent-cyan);
+    color: var(--color-accent-cyan);
+}
+
+.secondary:hover:not(:disabled) {
+    background: rgba(0, 212, 255, 0.1);
+}
+
+/* ---------- Traffic filters (unchanged layout) ---------- */
 .filters {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
-    padding: 1rem 2rem;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-xl);
 }
 
 .filters label {
     display: block;
-    font-size: 0.8rem;
+    font-size: var(--font-size-xs);
     text-transform: uppercase;
-    color: #94a3b8;
-    margin-bottom: 0.2rem;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-xs);
 }
 
 .filters input,
 .filters select {
     width: 100%;
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 4px;
-    padding: 0.4rem;
-    color: #e2e8f0;
+    box-sizing: border-box;
+    background: var(--color-bg-secondary);
+    border: var(--border-width-thin) solid var(--color-border-default);
+    border-radius: var(--border-radius-sm);
+    padding: 6px var(--spacing-sm);
+    color: var(--color-text-primary);
+    transition: border-color var(--transition-fast);
+}
+
+.filters input:focus,
+.filters select:focus {
+    outline: 2px solid var(--color-border-active);
+    outline-offset: 1px;
+    border-color: var(--color-border-active);
 }
 
 .export {
@@ -370,43 +471,7 @@ header {
 
 .export-buttons {
     display: flex;
-    gap: 0.4rem;
-}
-
-.ca-tip {
-    margin: 0 2rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid rgba(56, 189, 248, 0.2);
-    border-radius: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-
-.ca-tip p {
-    margin: 0.25rem 0 0;
-    color: #94a3b8;
-}
-
-.secondary {
-    background: transparent;
-    border: 1px solid rgba(56, 189, 248, 0.6);
-    color: #bae6fd;
-}
-
-button {
-    background: #38bdf8;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    gap: 6px;
 }
 
 main {
@@ -419,7 +484,7 @@ main {
 .list-panel,
 .detail-panel,
 .repeater-panel {
-    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    border-top: var(--border-width-thin) solid var(--color-border-default);
 }
 
 .list-panel,
@@ -428,22 +493,24 @@ main {
 }
 
 .repeater-panel {
-    padding: 1rem;
+    padding: var(--spacing-md);
 }
 
+/* ---------- Status pill ---------- */
 .pill {
-    padding: 0.25rem 0.6rem;
-    border-radius: 999px;
-    font-size: 0.85rem;
+    padding: var(--spacing-xs) 10px;
+    border-radius: var(--border-radius-full);
+    font-size: var(--font-size-xs);
+    font-family: var(--font-mono);
 }
 
 .pill.ok {
-    background: rgba(34, 197, 94, 0.2);
-    color: #4ade80;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--color-status-success);
 }
 
 .pill.warn {
-    background: rgba(248, 113, 113, 0.2);
-    color: #fca5a5;
+    background: rgba(255, 0, 110, 0.15);
+    color: var(--color-accent-magenta);
 }
 </style>
