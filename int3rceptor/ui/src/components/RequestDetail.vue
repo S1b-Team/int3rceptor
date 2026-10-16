@@ -93,7 +93,7 @@ section {
 }
 
 pre {
-  background: rgba(15, 23, 42, 0.8);
+  background: var(--color-bg-primary);
   padding: 0.6rem;
   border-radius: 4px;
   font-size: 0.85rem;
@@ -101,11 +101,11 @@ pre {
 }
 
 .binary-placeholder {
-  background: rgba(15, 23, 42, 0.4);
+  background: var(--color-bg-soft);
   padding: 1rem;
-  border: 1px dashed rgba(148, 163, 184, 0.3);
+  border: var(--border-width-thin) dashed var(--color-border-default);
   border-radius: 4px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-family: monospace;
   text-align: center;
 }
@@ -119,6 +119,6 @@ pre {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #94a3b8;
+  color: var(--color-text-muted);
 }
 </style>

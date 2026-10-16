@@ -78,6 +78,7 @@
                 :selected-id="selectedId"
                 :selected-entry="selectedEntry"
                 :exporting="exporting"
+                :loading="loading"
                 @select="handleSelect"
                 @export="exportData"
             />
