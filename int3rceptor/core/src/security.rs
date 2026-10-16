@@ -755,6 +755,10 @@ impl AuditLogger {
             .rev()
             .filter(|e| {
                 e.action.to_lowercase().contains(&query_lower)
+                    || e.user_id
+                        .as_ref()
+                        .map(|u| u.to_lowercase().contains(&query_lower))
+                        .unwrap_or(false)
                     || e.resource
                         .as_ref()
                         .map(|r| r.to_lowercase().contains(&query_lower))
