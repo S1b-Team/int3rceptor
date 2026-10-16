@@ -2,16 +2,50 @@
   {
     "id": "sqli-error-based",
     "name": "SQL Injection (Error-Based)",
-    "category": "Injection",
-    "severity": "High",
+    "category": "injection",
+    "severity": "high",
     "description": "SQL injection detected via error patterns",
     "request_patterns": [],
-    "response_patterns": ["sql syntax", "mysql_fetch", "ORA-", "syntax error"],
+    "response_patterns": [
+      "sql syntax",
+      "mysql_fetch",
+      "ORA-",
+      "syntax error"
+    ],
     "header_patterns": [],
-    "active_payloads": ["' OR '1'='1", "\" OR \"1\"=\"1", "1' UNION SELECT NULL--"],
+    "active_payloads": [
+      "' OR '1'='1",
+      "\" OR \"1\"=\"1",
+      "1' UNION SELECT NULL--"
+    ],
     "remediation": "Use prepared statements and sanitize inputs.",
-    "references": ["https://owasp.org/www-community/attacks/SQL_Injection"],
+    "references": [
+      "https://owasp.org/www-community/attacks/SQL_Injection"
+    ],
     "enabled": true
   },
-  {}
+  {
+    "id": "xss-reflected",
+    "name": "Cross-Site Scripting (Reflected)",
+    "category": "x_s_s",
+    "severity": "high",
+    "description": "User-supplied input appears to be reflected in the response without encoding",
+    "request_patterns": [],
+    "response_patterns": [
+      "<script>alert(",
+      "onerror=alert(",
+      "javascript:alert("
+    ],
+    "header_patterns": [],
+    "active_payloads": [
+      "<script>alert(1)</script>",
+      "\"><img src=x onerror=alert(1)>",
+      "javascript:alert(1)"
+    ],
+    "remediation": "Context-encode all untrusted output and apply a strict Content-Security-Policy.",
+    "references": [
+      "https://owasp.org/www-community/attacks/xss/"
+    ],
+    "enabled": true
+  }
 ]
