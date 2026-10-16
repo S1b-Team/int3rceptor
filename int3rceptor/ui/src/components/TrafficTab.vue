@@ -27,6 +27,7 @@ const props = defineProps<{
     selectedEntry: CaptureEntry | null;
     filters: TrafficFilters;
     exporting?: boolean;
+    loading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -123,8 +124,20 @@ function statusClass(code: number): string {
 </script>
 
 <template>
-    <div class="traffic-tab">
-        <section class="traffic-filters">
+    <div class="traffic-tab hexagon-bg">
+        <header class="traffic-header">
+            <h2 class="traffic-title">
+                <svg class="hex-mark" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2l8.66 5v10L12 22l-8.66-5V7z" />
+                </svg>
+                Traffic
+            </h2>
+            <span class="traffic-count" aria-live="polite">
+                {{ items.length }} {{ items.length === 1 ? "request" : "requests" }}
+            </span>
+        </header>
+
+        <section class="traffic-filters" aria-label="Traffic filters">
             <div class="field">
                 <label for="tf-method">Method</label>
                 <select
@@ -196,7 +209,7 @@ function statusClass(code: number): string {
         </section>
 
         <div class="traffic-content">
-            <div class="transaction-list">
+            <div class="transaction-list pane" :aria-busy="loading || undefined">
                 <table class="traffic-table" role="grid" aria-label="Captured requests">
                     <thead>
                         <tr>
@@ -230,7 +243,7 @@ function statusClass(code: number): string {
                                 </span>
                             </td>
                             <td class="col-host">
-                                <span v-if="row.entry.request.tls" class="tls" title="HTTPS">🔒</span>
+                                <span v-if="row.entry.request.tls" class="tls" title="HTTPS">TLS</span>
                                 {{ row.host }}
                             </td>
                             <td class="col-path" :title="row.entry.request.url">
@@ -254,14 +267,30 @@ function statusClass(code: number): string {
                         </tr>
                         <tr v-if="!items.length" class="empty-row">
                             <td colspan="8" class="empty-state">
-                                No requests captured yet.
+                                <svg
+                                    :class="['hex-mark', 'hex-lg', { 'animate-pulse-slow': loading }]"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                >
+                                    <path d="M12 2l8.66 5v10L12 22l-8.66-5V7z" />
+                                </svg>
+                                <template v-if="loading">
+                                    <p class="empty-title">Loading captured traffic…</p>
+                                </template>
+                                <template v-else>
+                                    <p class="empty-title">No requests captured yet</p>
+                                    <p class="empty-hint">
+                                        Point your client at the proxy and traffic will
+                                        appear here live.
+                                    </p>
+                                </template>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            <aside class="detail-panel">
+            <aside class="detail-panel pane" aria-label="Request details">
                 <RequestDetail :entry="selectedEntry" />
             </aside>
         </div>
@@ -280,6 +309,51 @@ function statusClass(code: number): string {
     min-height: 0;
     background: var(--color-bg-primary);
     color: var(--color-text-primary);
+}
+
+/* ---------- Header ---------- */
+.traffic-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-xl) 0;
+}
+
+.traffic-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--font-size-lg);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent-cyan);
+}
+
+.hex-mark {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: var(--color-accent-magenta);
+    stroke-width: 2;
+    filter: drop-shadow(0 0 4px var(--color-accent-magenta));
+}
+
+.hex-lg {
+    width: 48px;
+    height: 48px;
+    stroke: var(--color-accent-cyan);
+    filter: drop-shadow(0 0 8px var(--color-accent-cyan));
+}
+
+.traffic-count {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    padding: 2px var(--spacing-sm);
+    border: var(--border-width-thin) solid var(--color-border-default);
+    border-radius: var(--border-radius-full);
 }
 
 /* ---------- Filters ---------- */
@@ -343,7 +417,7 @@ function statusClass(code: number): string {
 }
 
 .ghost:hover:not(:disabled) {
-    background: rgba(0, 212, 255, 0.1);
+    background: color-mix(in srgb, var(--color-accent-cyan) 10%, transparent);
     box-shadow: var(--shadow-cyan);
 }
 
@@ -355,16 +429,24 @@ function statusClass(code: number): string {
 /* ---------- Layout ---------- */
 .traffic-content {
     display: flex;
+    gap: var(--spacing-md);
     flex: 1;
     min-height: 320px;
+    padding: var(--spacing-md) var(--spacing-xl);
     overflow: hidden;
+}
+
+.pane {
+    background: var(--color-bg-secondary);
+    border: var(--border-width-thin) solid var(--color-border-default);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
 }
 
 .transaction-list {
     flex: 1;
     min-width: 0;
     overflow: auto;
-    border-right: var(--border-width-thin) solid var(--color-border-default);
 }
 
 .detail-panel {
@@ -460,10 +542,18 @@ function statusClass(code: number): string {
     text-align: right;
     color: var(--color-text-secondary);
 }
+.col-size {
+    color: var(--color-accent-orange);
+}
 
 .tls {
-    font-size: var(--font-size-xs);
-    margin-right: 2px;
+    font-size: 0.625rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-status-success);
+    border: var(--border-width-thin) solid currentColor;
+    border-radius: var(--border-radius-sm);
+    padding: 0 3px;
+    margin-right: var(--spacing-xs);
 }
 
 .pending,
@@ -474,6 +564,18 @@ function statusClass(code: number): string {
 .empty-state {
     padding: var(--spacing-3xl) 0;
     text-align: center;
+    font-family: var(--font-sans);
+}
+
+.empty-title {
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-medium);
+}
+
+.empty-hint {
+    margin: 0;
+    font-size: var(--font-size-sm);
 }
 
 /* ---------- Badges ---------- */
