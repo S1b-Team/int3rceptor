@@ -462,13 +462,20 @@ graph TD
 | Variable                      | Default                   | Description                        |
 | ----------------------------- | ------------------------- | ---------------------------------- |
 | `INTERCEPTOR_DB_PATH`         | `data/interceptor.sqlite` | SQLite database location           |
+| `INTERCEPTOR_ENCRYPTION_KEY_FILE` | `./.interceptor_key` if present | File with the 64-hex-char capture encryption key (recommended) |
+| `INTERCEPTOR_ENCRYPTION_KEY`  | None                      | Capture encryption key as 64 hex chars (prefer the key file) |
+| `INTERCEPTOR_UNENCRYPTED`     | None                      | `1`/`true` stores captures in plaintext (testing only) |
 | `INTERCEPTOR_API_TOKEN`       | None                      | API authentication token           |
 | `INTERCEPTOR_MAX_BODY_BYTES`  | `2097152` (2MB)           | Maximum request/response body size |
 | `INTERCEPTOR_MAX_CONCURRENCY` | `64`                      | Maximum concurrent connections     |
 
+A capture encryption key is required to start. See
+[docs/STORAGE_ENCRYPTION.md](docs/STORAGE_ENCRYPTION.md) for setup.
+
 ### Example Configuration
 
 ```bash
+export INTERCEPTOR_ENCRYPTION_KEY_FILE="$HOME/.config/int3rceptor/key"
 export INTERCEPTOR_DB_PATH="/var/lib/interceptor/data.db"
 export INTERCEPTOR_API_TOKEN="your-secret-token"
 export INTERCEPTOR_MAX_BODY_BYTES="10485760"  # 10MB
@@ -486,7 +493,7 @@ export INTERCEPTOR_MAX_CONCURRENCY="128"
 1. **Certificate Management**: Keep CA private key secure
 2. **API Authentication**: Always set `INTERCEPTOR_API_TOKEN` in production
 3. **Network Isolation**: Run on localhost or isolated network
-4. **Database Encryption**: Consider encrypting SQLite database at rest
+4. **Database Encryption**: Captured headers and bodies are encrypted with AES-256-GCM; keep the key file private and backed up ([details](docs/STORAGE_ENCRYPTION.md))
 5. **Scope Configuration**: Use excludes to avoid capturing sensitive domains
 
 ### Responsible Disclosure

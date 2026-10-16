@@ -91,6 +91,12 @@ fn verify_signature(&self, license: &License) -> bool {
 
 ### 2. 🔴 CRITICAL: Unencrypted SQLite Database with Sensitive Data
 
+> **Status update:** Fixed. Headers and bodies are now encrypted per field with
+> AES-256-GCM (`core/src/database.rs`). Key handling was hardened later:
+> strict opt-out flag, no silent fallback, restrictive file permissions. See
+> [STORAGE_ENCRYPTION.md](STORAGE_ENCRYPTION.md). The analysis below describes
+> the original state.
+
 **Location:** `core/src/storage.rs` (entire capture database)
 
 **Severity:** CRITICAL (CVSS 8.6)  
@@ -1014,7 +1020,7 @@ logger.log(
 | ID | Finding | Severity | CVSS | Status |
 |----|---------|----------|------|--------|
 | 1 | License Signature Bypass | CRITICAL | 9.8 | Unfixed |
-| 2 | Unencrypted Database | CRITICAL | 8.6 | Unfixed |
+| 2 | Unencrypted Database | CRITICAL | 8.6 | Fixed (field-level AES-256-GCM, see Q1_2026_SECURITY_SPRINT_SUMMARY.md and STORAGE_ENCRYPTION.md) |
 | 3 | Weak Hardware Fingerprinting | CRITICAL | 8.8 | Unfixed |
 | 4 | Optional API Authentication | HIGH | 7.5 | Unfixed |
 | 5 | Optional CSRF Protection | HIGH | 6.9 | Unfixed |

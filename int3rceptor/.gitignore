@@ -183,3 +183,5 @@ SECURITY_FEATURES.md
 IMPLEMENTATION.md
 desktop/FULL_IMPLEMENTATION_PROGRESS.md
 
+# Capture encryption key (never commit)
+.interceptor_key
