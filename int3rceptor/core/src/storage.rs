@@ -652,6 +652,7 @@ mod tests {
 
     // Test fixtures only: fixed, obviously fake keys.
     fn test_key(byte: u8) -> EncryptionKeyProvider {
+        // codeql[rust/hard-coded-cryptographic-value]: Test fixture only; never used outside tests
         EncryptionKeyProvider::with_key([byte; 32])
     }
 

@@ -40,7 +40,7 @@ impl std::fmt::Debug for EncryptionKeyProvider {
 ///
 /// Kept separate from the process environment so the resolution logic can be
 /// tested without mutating global state.
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct KeySources {
     /// Value of `INTERCEPTOR_ENCRYPTION_KEY`, if set.
     pub key_hex: Option<String>,
@@ -50,6 +50,17 @@ pub struct KeySources {
     pub default_key_file: Option<PathBuf>,
     /// Value of `INTERCEPTOR_UNENCRYPTED`, if set.
     pub unencrypted: Option<String>,
+}
+
+impl std::fmt::Debug for KeySources {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeySources")
+            .field("key_hex", &self.key_hex.as_ref().map(|_| "<redacted>"))
+            .field("key_file", &self.key_file)
+            .field("default_key_file", &self.default_key_file)
+            .field("unencrypted", &self.unencrypted)
+            .finish()
+    }
 }
 
 impl KeySources {
@@ -326,6 +337,18 @@ mod tests {
 
     fn sources() -> KeySources {
         KeySources::default()
+    }
+
+    #[test]
+    fn test_key_sources_debug_redacts_key_hex() {
+        let s = KeySources {
+            key_hex: Some(TEST_KEY_HEX.into()),
+            ..sources()
+        };
+        let out = format!("{s:?}");
+        assert!(!out.contains(TEST_KEY_HEX));
+        assert!(out.contains("<redacted>"));
+        assert!(format!("{:?}", sources()).contains("key_hex: None"));
     }
 
     #[test]
