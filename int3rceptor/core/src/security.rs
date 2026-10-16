@@ -416,12 +416,12 @@ impl CsrfManager {
     /// Create a new CSRF manager with a random secret
     pub fn new(token_lifetime: Duration) -> Self {
         let mut secret = [0u8; 32];
-        // Use system randomness
-        if let Ok(bytes) = std::fs::read("/dev/urandom") {
-            for (i, &b) in bytes.iter().take(32).enumerate() {
-                secret[i] = b;
-            }
-        } else {
+        // Use system randomness. /dev/urandom never reaches EOF, so read exactly
+        // 32 bytes instead of reading the whole "file" (which grows without bound).
+        let read_ok = std::fs::File::open("/dev/urandom")
+            .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut secret))
+            .is_ok();
+        if !read_ok {
             // Fallback: use time-based seed
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
