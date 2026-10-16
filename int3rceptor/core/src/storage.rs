@@ -13,25 +13,31 @@ pub struct CaptureStorage {
     encryption: EncryptionKeyProvider,
 }
 
+/// Header added to a decoded entry when one of its encrypted fields could
+/// not be decrypted or parsed. The value names the affected field(s).
+pub const DECRYPT_ERROR_HEADER: &str = "x-interceptor-decrypt-error";
+
 impl CaptureStorage {
+    /// Open storage using the key configured in the environment.
+    /// Fails if no valid key is configured and plaintext was not explicitly enabled.
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref().to_path_buf();
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let encryption = EncryptionKeyProvider::new()?;
-        let storage = Self { path, encryption };
-        storage.init()?;
-        Ok(storage)
+        Self::with_encryption(path, EncryptionKeyProvider::new()?)
     }
 
-    /// Create storage with optional encryption disabled (testing only)
+    /// Open storage with encryption explicitly disabled (tests only).
+    ///
+    /// This always stores plaintext and never reads the environment.
     pub fn new_unencrypted(path: impl AsRef<Path>) -> Result<Self> {
+        Self::with_encryption(path, EncryptionKeyProvider::disabled())
+    }
+
+    /// Open storage with an explicit key provider.
+    pub fn with_encryption(
+        path: impl AsRef<Path>,
+        encryption: EncryptionKeyProvider,
+    ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let encryption = EncryptionKeyProvider::default();
+        prepare_db_path(&path)?;
         let storage = Self { path, encryption };
         storage.init()?;
         Ok(storage)
@@ -78,12 +84,16 @@ impl CaptureStorage {
 
         // Encrypt sensitive request data
         let headers_json = serde_json::to_string(&entry.request.headers)?;
-        let encrypted_headers = database::encrypt_if_enabled(&self.encryption, headers_json.as_bytes())?;
+        let encrypted_headers =
+            database::encrypt_if_enabled(&self.encryption, headers_json.as_bytes())?;
 
         let encrypted_body = if entry.request.body.is_empty() {
             None
         } else {
-            Some(database::encrypt_if_enabled(&self.encryption, &entry.request.body)?)
+            Some(database::encrypt_if_enabled(
+                &self.encryption,
+                &entry.request.body,
+            )?)
         };
 
         // Encrypt sensitive response data
@@ -148,8 +158,6 @@ impl CaptureStorage {
     }
 
     pub fn query(&self, filter: &CaptureQuery) -> Result<Vec<CaptureEntry>> {
-        use crate::database;
-
         let mut sql = String::from(
             "SELECT id, timestamp_ms, method, url, headers, body, tls, resp_status, resp_headers, resp_body, duration_ms FROM captures WHERE 1=1",
         );
@@ -172,7 +180,7 @@ impl CaptureStorage {
             values.push(if tls { "1" } else { "0" }.into());
         }
         if let Some(search) = &filter.search {
-            sql.push_str(" AND (url LIKE ?)");  // Note: can't search encrypted headers
+            sql.push_str(" AND (url LIKE ?)"); // Note: can't search encrypted headers
             let pattern = format!("%{}%", search);
             values.push(pattern);
         }
@@ -186,46 +194,35 @@ impl CaptureStorage {
         let mut rows = stmt.query(&param_refs[..])?;
         let mut entries = Vec::new();
         while let Some(row) = rows.next()? {
+            let id = row.get::<_, i64>(0)? as u64;
+            let mut failed: Vec<&'static str> = Vec::new();
+
             // Decrypt sensitive request data
             let encrypted_headers: Vec<u8> = row.get(4)?;
-            let decrypted_headers = database::decrypt_if_enabled(&self.encryption, &encrypted_headers)?;
-            let headers = serde_json::from_slice::<Vec<(String, String)>>(&decrypted_headers)
-                .unwrap_or_default();
-
+            let mut headers =
+                self.decode_headers(id, "request headers", Some(&encrypted_headers), &mut failed);
             let encrypted_body: Option<Vec<u8>> = row.get(5)?;
-            let body = encrypted_body
-                .as_ref()
-                .and_then(|b| database::decrypt_if_enabled(&self.encryption, b).ok())
-                .unwrap_or_default();
-
-            let request = CapturedRequest {
-                id: row.get::<_, i64>(0)? as u64,
-                timestamp_ms: row.get::<_, i64>(1)? as i128,
-                method: row.get(2)?,
-                url: row.get(3)?,
-                headers,
-                body,
-                tls: row.get::<_, i64>(6)? == 1,
-            };
+            let body = self.decode_body(id, "request body", encrypted_body.as_deref(), &mut failed);
 
             let response = match row.get::<_, Option<i64>>(7)? {
                 Some(status) => {
                     let encrypted_resp_headers: Option<Vec<u8>> = row.get(8)?;
-                    let headers = encrypted_resp_headers
-                        .as_ref()
-                        .and_then(|h| database::decrypt_if_enabled(&self.encryption, h).ok())
-                        .and_then(|h| serde_json::from_slice::<Vec<(String, String)>>(&h).ok())
-                        .unwrap_or_default();
-
+                    let headers = self.decode_headers(
+                        id,
+                        "response headers",
+                        encrypted_resp_headers.as_deref(),
+                        &mut failed,
+                    );
                     let encrypted_resp_body: Option<Vec<u8>> = row.get(9)?;
-                    let body = encrypted_resp_body
-                        .as_ref()
-                        .and_then(|b| database::decrypt_if_enabled(&self.encryption, b).ok())
-                        .unwrap_or_default();
-
+                    let body = self.decode_body(
+                        id,
+                        "response body",
+                        encrypted_resp_body.as_deref(),
+                        &mut failed,
+                    );
                     let duration_ms = row.get::<_, Option<i64>>(10)?.unwrap_or(0) as u128;
                     Some(CapturedResponse {
-                        request_id: request.id,
+                        request_id: id,
                         status_code: status as u16,
                         headers,
                         body,
@@ -234,10 +231,113 @@ impl CaptureStorage {
                 }
                 None => None,
             };
+
+            // Make unreadable fields visible instead of silently empty.
+            if !failed.is_empty() {
+                headers.push((DECRYPT_ERROR_HEADER.to_string(), failed.join(", ")));
+            }
+
+            let request = CapturedRequest {
+                id,
+                timestamp_ms: row.get::<_, i64>(1)? as i128,
+                method: row.get(2)?,
+                url: row.get(3)?,
+                headers,
+                body,
+                tls: row.get::<_, i64>(6)? == 1,
+            };
             entries.push(CaptureEntry { request, response });
         }
         Ok(entries)
     }
+}
+
+impl CaptureStorage {
+    fn decrypt_field(
+        &self,
+        id: u64,
+        field: &'static str,
+        data: &[u8],
+        failed: &mut Vec<&'static str>,
+    ) -> Option<Vec<u8>> {
+        match crate::database::decrypt_if_enabled(&self.encryption, data) {
+            Ok(v) => Some(v),
+            Err(e) => {
+                tracing::warn!(capture_id = id, field, error = %e, "failed to decrypt stored capture field (wrong key or plaintext database?)");
+                failed.push(field);
+                None
+            }
+        }
+    }
+
+    fn decode_headers(
+        &self,
+        id: u64,
+        field: &'static str,
+        data: Option<&[u8]>,
+        failed: &mut Vec<&'static str>,
+    ) -> Vec<(String, String)> {
+        let Some(data) = data else { return Vec::new() };
+        let Some(plain) = self.decrypt_field(id, field, data, failed) else {
+            return Vec::new();
+        };
+        match serde_json::from_slice::<Vec<(String, String)>>(&plain) {
+            Ok(h) => h,
+            Err(e) => {
+                tracing::warn!(capture_id = id, field, error = %e, "stored capture headers are not valid JSON");
+                failed.push(field);
+                Vec::new()
+            }
+        }
+    }
+
+    fn decode_body(
+        &self,
+        id: u64,
+        field: &'static str,
+        data: Option<&[u8]>,
+        failed: &mut Vec<&'static str>,
+    ) -> Vec<u8> {
+        data.and_then(|d| self.decrypt_field(id, field, d, failed))
+            .unwrap_or_default()
+    }
+}
+
+/// Create the database directory (0700) and file (0600) with restrictive
+/// permissions on Unix before SQLite opens it. Existing paths are left alone.
+fn prepare_db_path(path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            create_private_dir_all(parent)?;
+        }
+    }
+    if !path.exists() {
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        match opts.open(path) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
+
+/// `create_dir_all` that uses mode 0700 for newly created directories on Unix.
+pub(crate) fn create_private_dir_all(dir: &Path) -> std::io::Result<()> {
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(dir)
 }
 
 fn clamp_i128(value: i128) -> i64 {
@@ -548,5 +648,76 @@ mod tests {
         // Test clamp_u128
         assert_eq!(clamp_u128(100), 100);
         assert_eq!(clamp_u128(i64::MAX as u128 + 1), i64::MAX);
+    }
+
+    // Test fixtures only: fixed, obviously fake keys.
+    fn test_key(byte: u8) -> EncryptionKeyProvider {
+        EncryptionKeyProvider::with_key([byte; 32])
+    }
+
+    #[test]
+    fn test_encrypted_roundtrip_and_ciphertext_on_disk() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("enc.db");
+        let storage = CaptureStorage::with_encryption(&db_path, test_key(7)).unwrap();
+        storage
+            .insert(&create_test_entry(1, "POST", "https://x.test/a", Some(200)))
+            .unwrap();
+        let got = storage.query(&CaptureQuery::default()).unwrap();
+        assert_eq!(got[0].request.body, b"request body");
+        assert!(!got[0]
+            .request
+            .headers
+            .iter()
+            .any(|(k, _)| k == DECRYPT_ERROR_HEADER));
+        let raw = std::fs::read(&db_path).unwrap();
+        assert!(!raw.windows(12).any(|w| w == b"request body"));
+    }
+
+    #[test]
+    fn test_wrong_key_marks_entry_instead_of_silently_empty() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("enc.db");
+        CaptureStorage::with_encryption(&db_path, test_key(1))
+            .unwrap()
+            .insert(&create_test_entry(1, "GET", "https://x.test/", Some(200)))
+            .unwrap();
+        let got = CaptureStorage::with_encryption(&db_path, test_key(2))
+            .unwrap()
+            .query(&CaptureQuery::default())
+            .unwrap();
+        let marker = got[0]
+            .request
+            .headers
+            .iter()
+            .find(|(k, _)| k == DECRYPT_ERROR_HEADER)
+            .expect("decrypt failure must be marked");
+        assert!(marker.1.contains("request headers"));
+        assert!(marker.1.contains("response body"));
+    }
+
+    #[test]
+    fn test_new_unencrypted_is_always_plaintext() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("plain.db");
+        let storage = CaptureStorage::new_unencrypted(&db_path).unwrap();
+        storage
+            .insert(&create_test_entry(1, "GET", "http://x.test/", None))
+            .unwrap();
+        let raw = std::fs::read(&db_path).unwrap();
+        assert!(raw.windows(12).any(|w| w == b"request body"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_db_file_and_dir_created_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        let sub = dir.path().join("nested/data");
+        let db_path = sub.join("c.db");
+        CaptureStorage::new_unencrypted(&db_path).unwrap();
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&db_path), 0o600);
+        assert_eq!(mode(&sub), 0o700);
     }
 }

@@ -156,3 +156,6 @@ ROADMAP.md
 .parcel-cache/
 coverage/
 .nyc_output/
+
+# Capture encryption key (never commit)
+.interceptor_key

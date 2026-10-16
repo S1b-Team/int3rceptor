@@ -55,6 +55,7 @@ fn verify_signature(&self, _license: &License) -> bool {
 - ✅ Created `core/src/database.rs` - `EncryptionKeyProvider`
 - ✅ Environment variable support: `INTERCEPTOR_ENCRYPTION_KEY`
 - ✅ Maintains plaintext metadata for searchability
+- ✅ Follow-up hardening: `INTERCEPTOR_ENCRYPTION_KEY_FILE` (recommended), invalid keys are hard errors, `INTERCEPTOR_UNENCRYPTED` only accepts `1`/`true` and logs a warning, 0600/0700 permissions on the CA key and database. See [STORAGE_ENCRYPTION.md](STORAGE_ENCRYPTION.md).
 
 **Encrypted Fields:**
 - request.headers (auth tokens, API keys)
