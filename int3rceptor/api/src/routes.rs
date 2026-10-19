@@ -1172,6 +1172,15 @@ mod proxy_route_tests {
     use tokio::sync::RwLock;
     use tower::util::ServiceExt;
 
+    /// One throwaway CA directory per test binary, so tests never read or
+    /// write the real ~/.interceptor/ca. Tests running in parallel share it;
+    /// CertManager creates the CA atomically under a lock.
+    fn test_ca_dir() -> &'static std::path::Path {
+        static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+        DIR.get_or_init(|| tempfile::tempdir().expect("temp CA dir"))
+            .path()
+    }
+
     async fn test_state() -> Arc<AppState> {
         interceptor_core::connection_pool::install_crypto_provider();
         let capture = Arc::new(RequestCapture::new(100));
@@ -1190,7 +1199,8 @@ mod proxy_route_tests {
             Some(scanner.clone()),
             intercept.clone(),
         ));
-        let cert_manager = Arc::new(CertManager::new().expect("cert manager"));
+        let cert_manager =
+            Arc::new(CertManager::with_dir(test_ca_dir().join("ca")).expect("cert manager"));
         let mut license_manager = interceptor_core::license::LicenseManager::new();
         let _ = license_manager.load_license();
 
@@ -1532,7 +1542,7 @@ mod proxy_route_tests {
         let interceptor_pem = base.cert_manager.ca_pem().expect("ca pem");
         assert_eq!(
             interceptor_pem, disk_ca,
-            "runtime CA diverged from ~/.interceptor/ca"
+            "runtime CA diverged from the CA on disk"
         );
 
         let tls = Arc::new(
