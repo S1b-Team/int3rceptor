@@ -28,8 +28,7 @@ rusqlite.workspace = true
 regex = "1.10"
 obfstr = "0.4"
 once_cell = "1.19"
-sentry = { version = "0.46.0", default-features = false, features = ["backtrace", "panic", "transport", "anyhow"] }
-sentry-tracing = "0.46.0"
+sentry = { version = "0.46.0", default-features = false, features = ["backtrace", "panic", "reqwest", "rustls", "anyhow"] }
 # Security improvements for Q1 2026
 ed25519-dalek = { version = "2.1", features = ["std"] }
 aes-gcm = "0.10"
@@ -41,7 +40,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4"] }
 urlencoding = "2.1"
 # Plugin system (WASM)
-# Updated to 36.0.6+ to fix multiple security vulnerabilities
+# Updated to 36.0.18+ to fix multiple security vulnerabilities
 # - RUSTSEC-2024-0438: Windows device filename sandboxing
 # - RUSTSEC-2025-0046: fd_renumber panic
 # - RUSTSEC-2025-0118: Unsound shared memory access
@@ -49,8 +48,8 @@ urlencoding = "2.1"
 # - CVE-2025-XXXX: Unsound API access to shared linear memory
 # - GHSA: wasi:http/types.fields panic on excessive fields
 # - GHSA: WASI guest-controlled resource exhaustion DoS
-wasmtime = "36.0.6"
-wasmtime-wasi = "36.0.6"
+# - RUSTSEC-2026-0363: component-model handle tables not charged to any limit
+wasmtime = "36.0.18"
 hex = "0.4.3"
 html-escape = "0.2.13"
 similar = "2.7.0"
