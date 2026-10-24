@@ -43,10 +43,6 @@ pub use scanner::{
     DetectionRule, Finding, ScanConfig, ScanStats, Scanner, Severity, VulnerabilityCategory,
 };
 pub use scope::ScopeManager;
-pub use security::{
-    constant_time_compare, AuditEntry, AuditEntryBuilder, AuditEventType, AuditLogger,
-    AuditOutcome, AuditSeverity, CsrfManager, CsrfValidationResult, IpFilter, IpFilterResult,
-    RateLimitResult, RateLimiter, TlsConfig,
-};
+pub use security::{constant_time_compare, RateLimitResult, RateLimiter};
 pub use storage::CaptureStorage;
 pub use websocket::{WsCapture, WsStats};
