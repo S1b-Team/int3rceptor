@@ -309,6 +309,7 @@ fn normalize_uri(uri: &Uri, headers: &HeaderMap) -> Result<Uri> {
     Ok(full.parse()?)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn forward_request(
     req: Request<Incoming>,
     pool: ConnectionPool,
@@ -337,7 +338,7 @@ async fn forward_request(
         .await;
     }
 
-    let mut target_uri =
+    let target_uri =
         mark_intercepted_https(normalize_uri(req.uri(), req.headers())?, upstream_tls)?;
 
     // Track host metrics
@@ -431,8 +432,7 @@ async fn forward_request(
                 }
                 if let Some(url) = url {
                     if let Ok(parsed) = url.parse::<Uri>() {
-                        parts.uri = parsed.clone();
-                        target_uri = parsed;
+                        parts.uri = parsed;
                         record.url = url;
                     }
                 }

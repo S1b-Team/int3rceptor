@@ -5,14 +5,13 @@
 // ║  P3 Security: Session-based CSRF protection (not IP-based spoofing)      ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-use interceptor_core::security::constant_time_compare;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::RwLock;
+use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
 const SESSION_EXPIRY_SECS: u64 = 3600; // 1 hour
-const SESSION_COOKIE_NAME: &str = "int3rceptor_session";
+pub(crate) const SESSION_COOKIE_NAME: &str = "int3rceptor_session";
 const SESSION_COOKIE_VALUE_PREFIX: &str = "session_";
 
 /// Session entry with creation timestamp

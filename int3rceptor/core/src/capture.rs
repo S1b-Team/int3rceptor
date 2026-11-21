@@ -73,7 +73,6 @@ pub struct RequestCapture {
     notifier: broadcast::Sender<CaptureEntry>,
     storage: Option<Arc<CaptureStorage>>,
     activities: RwLock<VecDeque<DashboardActivity>>,
-    activity_counter: AtomicU64,
 }
 
 impl RequestCapture {
@@ -115,7 +114,6 @@ impl RequestCapture {
             notifier: tx,
             storage,
             activities: RwLock::new(VecDeque::new()),
-            activity_counter: AtomicU64::new(1),
         }
     }
 

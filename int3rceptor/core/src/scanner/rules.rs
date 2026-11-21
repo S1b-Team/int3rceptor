@@ -207,14 +207,14 @@ impl DetectionRule {
 
     /// Get default security rules
     pub fn default_rules() -> Vec<DetectionRule> {
-        let mut rules: Vec<DetectionRule> =
-            match serde_json::from_str(include_str!("free_rules.json")) {
-                Ok(rules) => rules,
-                Err(e) => {
-                    warn!("Failed to parse bundled free_rules.json: {e}");
-                    Vec::new()
-                }
-            };
+        let rules: Vec<DetectionRule> = match serde_json::from_str(include_str!("free_rules.json"))
+        {
+            Ok(rules) => rules,
+            Err(e) => {
+                warn!("Failed to parse bundled free_rules.json: {e}");
+                Vec::new()
+            }
+        };
 
         #[cfg(feature = "pro")]
         {

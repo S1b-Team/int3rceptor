@@ -143,7 +143,7 @@ mod tests {
 
         // Create a minimal WASM file (magic + version)
         let wasm_header = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
-        std::fs::write(&plugin_file, &wasm_header).unwrap();
+        std::fs::write(&plugin_file, wasm_header).unwrap();
 
         let validator = PluginSecurityValidator::new(vec![temp_dir.path().to_path_buf()]);
         let result = validator.validate_plugin_path(&plugin_file);
@@ -157,7 +157,7 @@ mod tests {
         let other_dir = TempDir::new().unwrap();
         let plugin_file = other_dir.path().join("plugin.wasm");
 
-        std::fs::write(&plugin_file, &[0x00, 0x61, 0x73, 0x6d]).unwrap();
+        std::fs::write(&plugin_file, [0x00, 0x61, 0x73, 0x6d]).unwrap();
 
         let validator = PluginSecurityValidator::new(vec![temp_dir.path().to_path_buf()]);
         let result = validator.validate_plugin_path(&plugin_file);
@@ -174,11 +174,11 @@ mod tests {
 
         // Valid WASM file
         let valid_wasm = temp_dir.path().join("valid.wasm");
-        std::fs::write(&valid_wasm, &[0x00, 0x61, 0x73, 0x6d]).unwrap();
+        std::fs::write(&valid_wasm, [0x00, 0x61, 0x73, 0x6d]).unwrap();
 
         // Invalid WASM file
         let invalid_wasm = temp_dir.path().join("invalid.wasm");
-        std::fs::write(&invalid_wasm, &[0xff, 0xff, 0xff, 0xff]).unwrap();
+        std::fs::write(&invalid_wasm, [0xff, 0xff, 0xff, 0xff]).unwrap();
 
         let validator = PluginSecurityValidator::new(vec![temp_dir.path().to_path_buf()]);
 

@@ -129,7 +129,7 @@ pub fn capture_anyhow(err: &anyhow::Error, module: &str, tags: &[(&str, &str)]) 
 
         for (k, v) in tags {
             if is_safe_tag_key(k) {
-                scope.set_tag(*k, *v);
+                scope.set_tag(k, *v);
             }
         }
     });
@@ -219,13 +219,7 @@ fn telemetry_tier() -> u8 {
 }
 
 fn clamp_rate(rate: f32) -> f32 {
-    if rate < 0.0 {
-        0.0
-    } else if rate > MAX_TRACING_RATE {
-        MAX_TRACING_RATE
-    } else {
-        rate
-    }
+    rate.clamp(0.0, MAX_TRACING_RATE)
 }
 
 fn is_safe_tag_key(key: &str) -> bool {

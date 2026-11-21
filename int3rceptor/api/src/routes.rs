@@ -1,7 +1,7 @@
 use crate::{
     models::{
-        ActivityQuery, AppSettings, DashboardActivity, HeaderPatch, ManualRequest, ManualResponse,
-        PluginInfo, PluginToggle, RepeatRequest,
+        ActivityQuery, AppSettings, HeaderPatch, ManualRequest, ManualResponse, PluginInfo,
+        PluginToggle, RepeatRequest,
     },
     state::AppState,
 };
@@ -1881,7 +1881,7 @@ mod proxy_route_tests {
             .expect("api connect");
         let req = format!(
             "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-            body.as_bytes().len()
+            body.len()
         );
         sock.write_all(req.as_bytes()).await.expect("api write");
         read_response(sock).await
