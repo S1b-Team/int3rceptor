@@ -504,7 +504,7 @@ async function handleFileUpload(event: Event) {
               <div class="flex-1 min-w-0">
                 <h4 class="text-base font-bold text-i3-text truncate">{{ plugin.name }}</h4>
                 <div class="flex items-center gap-2 mt-1">
-                  <Badge :variant="plugin.enabled ? 'cyan' : 'gray'}" outline size="sm">
+                  <Badge :variant="plugin.enabled ? 'cyan' : 'gray'" outline size="sm">
                     {{ plugin.enabled ? 'Active' : 'Disabled' }}
                   </Badge>
                   <Badge :variant="getCategoryColor(plugin.category)" outline size="sm">
