@@ -157,6 +157,7 @@ pub fn router() -> Router {
         .route("/api/metrics", get(get_metrics))
         .route("/api/metrics/reset", post(reset_metrics))
         .route("/api/health", get(health_check))
+        .route("/api/dashboard/metrics", get(get_dashboard_metrics))
         .route("/api/dashboard/activity", get(get_dashboard_activity))
         .route(
             "/api/dashboard/activity/clear",
@@ -654,6 +655,11 @@ async fn health_check(Extension(state): Extension<Arc<AppState>>) -> impl IntoRe
         "requests_total": m.requests_total,
         "capture_count": state.capture.len(),
     }))
+}
+
+async fn get_dashboard_metrics() -> impl IntoResponse {
+    let snapshot = metrics::metrics().snapshot();
+    Json(crate::dashboard_metrics::RateSampler::global().sample(&snapshot, Instant::now()))
 }
 
 // Dashboard Activity handlers
@@ -1238,6 +1244,40 @@ mod proxy_route_tests {
             proxy,
             intercept,
         })
+    }
+
+    #[tokio::test]
+    async fn dashboard_metrics_contract() {
+        let state = test_state().await;
+        let app = router().layer(Extension(state));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/dashboard/metrics")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+
+        // Every field of the frontend `SystemMetrics` type that the backend provides.
+        for field in [
+            "timestamp",
+            "requests_per_sec",
+            "avg_response_time_ms",
+            "memory_usage_mb",
+            "active_connections",
+            "bytes_in_sec",
+            "bytes_out_sec",
+            "error_rate_percent",
+            "uptime_seconds",
+        ] {
+            assert!(body[field].is_number(), "{field} must be a number");
+        }
+        assert!(body["timestamp"].as_i64().unwrap() > 1_600_000_000_000);
     }
 
     #[tokio::test]
