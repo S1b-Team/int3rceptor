@@ -29,7 +29,7 @@ dashmap = "5.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 clap = { version = "4.4", features = ["derive"] }
-time = { version = "0.3.47", features = ["macros"] }
+time = { version = "0.3.47", features = ["macros", "parsing"] }
 base64 = "0.22"
 rusqlite = { version = "0.43", features = ["bundled"] }
 

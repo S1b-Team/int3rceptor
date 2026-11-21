@@ -32,6 +32,7 @@ Remote exposure without those controls is not the intended deployment.
 | GET | `/api/requests/:id` | One request |
 | POST | `/api/requests/:id/repeat` | Replay a stored request |
 | GET | `/api/requests/export` | Export capture |
+| POST | `/api/requests/import` | Import a HAR file (raw JSON body) into the capture. Returns `{"imported": n, "skipped": m}`; `400` if the body is not a HAR file or has more than 10,000 entries. Entries that are not usable (non-http(s) URL, invalid method) are skipped. The body is limited by `INTERCEPTOR_MAX_BODY_BYTES`. |
 
 ## Repeater
 

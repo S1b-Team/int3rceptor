@@ -6,6 +6,7 @@ pub mod crypto;
 pub mod database;
 pub mod encoding;
 pub mod error;
+pub mod har;
 pub mod integration;
 pub mod intercept;
 pub mod intruder;

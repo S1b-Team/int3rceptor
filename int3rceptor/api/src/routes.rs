@@ -113,6 +113,7 @@ pub fn router() -> Router {
         .route("/api/plugins/upload", post(upload_plugin))
         .route("/api/plugins/:name/toggle", post(toggle_plugin))
         .route("/api/requests/export", get(export_requests))
+        .route("/api/requests/import", post(import_requests))
         .route("/api/ca-cert", get(download_ca_cert))
         .route(
             "/api/rules",
@@ -362,6 +363,40 @@ async fn export_requests(
     let query: CaptureQuery = params.filters.into();
     let entries = state.capture.query(&query);
     build_export_response(entries, params.format)
+}
+
+/// Import a HAR file (the raw JSON body) into the capture. The size is bounded by
+/// the API body limit and the entry count by `MAX_HAR_ENTRIES`.
+async fn import_requests(
+    Extension(state): Extension<Arc<AppState>>,
+    body: Bytes,
+) -> impl IntoResponse {
+    let import = match interceptor_core::har::parse_har(&body) {
+        Ok(import) => import,
+        Err(err) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": err.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    let imported = import.entries.len();
+    let skipped = import.skipped;
+    let capture = state.capture.clone();
+    // Capturing can write to SQLite for every entry, so keep it off the async runtime.
+    let pushed = tokio::task::spawn_blocking(move || {
+        for entry in import.entries {
+            capture.push(entry.request, entry.response);
+        }
+    })
+    .await;
+    if pushed.is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    Json(json!({ "imported": imported, "skipped": skipped })).into_response()
 }
 
 fn to_header_patches(headers: &[(String, String)]) -> Vec<HeaderPatch> {
@@ -1244,6 +1279,111 @@ mod proxy_route_tests {
             proxy,
             intercept,
         })
+    }
+
+    async fn post_import(state: Arc<AppState>, body: Vec<u8>) -> (StatusCode, serde_json::Value) {
+        let app = router().layer(Extension(state));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/requests/import")
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        (status, serde_json::from_slice(&bytes).unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn import_har_adds_entries_to_the_capture() {
+        let state = test_state().await;
+        let har = serde_json::json!({"log": {"version": "1.2", "entries": [
+            {
+                "startedDateTime": "2026-03-01T10:00:00Z",
+                "time": 12,
+                "request": {
+                    "method": "GET",
+                    "url": "https://example.com/a",
+                    "headers": [{"name": "Accept", "value": "*/*"}]
+                },
+                "response": {"status": 200, "headers": [], "content": {"text": "hi"}}
+            },
+            {"request": {"method": "GET", "url": "ftp://example.com/skipped"}}
+        ]}});
+
+        let (status, body) = post_import(state.clone(), serde_json::to_vec(&har).unwrap()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["imported"], 1);
+        assert_eq!(body["skipped"], 1);
+
+        let stored = state.capture.get_all();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].request.url, "https://example.com/a");
+        assert_eq!(stored[0].response.as_ref().unwrap().body, b"hi");
+    }
+
+    #[tokio::test]
+    async fn import_har_rejects_malformed_input_with_400() {
+        let state = test_state().await;
+        for body in [b"not json".to_vec(), b"{}".to_vec(), b"[]".to_vec()] {
+            let (status, body) = post_import(state.clone(), body).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(body["error"].is_string());
+        }
+        assert!(state.capture.is_empty());
+    }
+
+    #[tokio::test]
+    async fn har_export_can_be_imported_again() {
+        let source = test_state().await;
+        let mut request = CapturedRequest::new("POST", "https://example.com/login", true);
+        request.headers = vec![("Content-Type".into(), "application/json".into())];
+        request.body = b"{}".to_vec();
+        source.capture.push(
+            request,
+            Some(CapturedResponse {
+                request_id: 0,
+                status_code: 403,
+                headers: vec![("Server".into(), "x".into())],
+                body: Vec::new(),
+                duration_ms: 7,
+            }),
+        );
+
+        let export = router()
+            .layer(Extension(source))
+            .oneshot(
+                Request::builder()
+                    .uri("/api/requests/export?format=har")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(export.status(), StatusCode::OK);
+        let har = export.into_body().collect().await.unwrap().to_bytes();
+
+        let target = test_state().await;
+        let (status, body) = post_import(target.clone(), har.to_vec()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["imported"], 1);
+
+        let entry = &target.capture.get_all()[0];
+        assert_eq!(entry.request.method, "POST");
+        assert_eq!(entry.request.url, "https://example.com/login");
+        assert!(entry.request.tls);
+        assert_eq!(
+            entry.request.headers,
+            vec![("Content-Type".to_string(), "application/json".to_string())]
+        );
+        let response = entry.response.as_ref().unwrap();
+        assert_eq!(response.status_code, 403);
+        assert_eq!(response.duration_ms, 7);
     }
 
     #[tokio::test]
