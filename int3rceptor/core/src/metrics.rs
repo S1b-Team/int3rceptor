@@ -242,11 +242,7 @@ impl Metrics {
     pub fn snapshot(&self) -> MetricsSnapshot {
         let duration_count = self.request_duration_count.load(Ordering::Relaxed);
         let duration_sum = self.request_duration_sum_us.load(Ordering::Relaxed);
-        let avg_duration_us = if duration_count > 0 {
-            duration_sum / duration_count
-        } else {
-            0
-        };
+        let avg_duration_us = duration_sum.checked_div(duration_count).unwrap_or(0);
 
         MetricsSnapshot {
             uptime_secs: self.start_time.elapsed().as_secs(),
@@ -286,7 +282,7 @@ impl Metrics {
     pub fn top_hosts(&self, n: usize) -> Vec<(String, u64)> {
         let hosts = self.host_requests.read();
         let mut vec: Vec<_> = hosts.iter().map(|(k, v)| (k.clone(), *v)).collect();
-        vec.sort_by(|a, b| b.1.cmp(&a.1));
+        vec.sort_by_key(|entry| std::cmp::Reverse(entry.1));
         vec.truncate(n);
         vec
     }

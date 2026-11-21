@@ -14,7 +14,7 @@ vi.mock('@/composables/useApi', () => ({
 }));
 
 // Mock Vue lifecycle hooks
-const mockOnBeforeUnmount = vi.fn();
+const mockOnBeforeUnmount = vi.hoisted(() => vi.fn());
 vi.mock('vue', async () => {
   const actual = await vi.importActual('vue');
   return {
@@ -269,8 +269,7 @@ describe('useDashboardConnections', () => {
       await fetchConnections();
 
       // Advance timers to allow retry
-      vi.advanceTimersByTime(1500);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(1500);
 
       expect(mockApi.get).toHaveBeenCalledTimes(2);
     });
@@ -284,8 +283,7 @@ describe('useDashboardConnections', () => {
 
       // Simulate 3 retries
       for (let i = 0; i < 3; i++) {
-        vi.advanceTimersByTime(5000);
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(5000);
       }
 
       expect(error.value).toContain('max retries exceeded');
@@ -310,8 +308,7 @@ describe('useDashboardConnections', () => {
       startAutoFetch(2000);
 
       // Advance time past interval
-      vi.advanceTimersByTime(2500);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(2500);
 
       expect(mockApi.get.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
@@ -328,8 +325,7 @@ describe('useDashboardConnections', () => {
       startAutoFetch(1000);
       startAutoFetch(1000); // Try to start again
 
-      vi.advanceTimersByTime(1500);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(1500);
 
       // Should only have expected calls, not doubled
       expect(mockApi.get.mock.calls.length).toBeLessThanOrEqual(3);
@@ -347,8 +343,7 @@ describe('useDashboardConnections', () => {
       startAutoFetch(); // Use default interval
 
       // Advance less than default interval (5000ms)
-      vi.advanceTimersByTime(3000);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(3000);
 
       // Should only have initial call
       expect(mockApi.get).toHaveBeenCalledTimes(1);
@@ -376,8 +371,7 @@ describe('useDashboardConnections', () => {
 
       const callCountAfterStop = mockApi.get.mock.calls.length;
 
-      vi.advanceTimersByTime(3000);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(3000);
 
       expect(mockApi.get.mock.calls.length).toBe(callCountAfterStop);
     });

@@ -192,7 +192,7 @@ impl CertManager {
         let key = key_pair.serialize_der();
         let der = cert.der();
         let key = PrivatePkcs8KeyDer::from(key);
-        let pair = Arc::new((CertificateDer::from(der.clone()), PrivateKeyDer::from(key)));
+        let pair = Arc::new((der.clone(), PrivateKeyDer::from(key)));
         self.cert_cache.insert(domain.to_string(), pair.clone());
         Ok(pair)
     }

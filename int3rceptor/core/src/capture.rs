@@ -73,7 +73,6 @@ pub struct RequestCapture {
     notifier: broadcast::Sender<CaptureEntry>,
     storage: Option<Arc<CaptureStorage>>,
     activities: RwLock<VecDeque<DashboardActivity>>,
-    activity_counter: AtomicU64,
 }
 
 impl RequestCapture {
@@ -115,7 +114,6 @@ impl RequestCapture {
             notifier: tx,
             storage,
             activities: RwLock::new(VecDeque::new()),
-            activity_counter: AtomicU64::new(1),
         }
     }
 
@@ -191,7 +189,13 @@ impl RequestCapture {
 
     // Activity log methods
 
-    pub fn log_activity(&self, event_type: impl Into<String>, message: impl Into<String>, level: impl Into<String>, details: Option<serde_json::Value>) {
+    pub fn log_activity(
+        &self,
+        event_type: impl Into<String>,
+        message: impl Into<String>,
+        level: impl Into<String>,
+        details: Option<serde_json::Value>,
+    ) {
         let activity = DashboardActivity {
             timestamp: OffsetDateTime::now_utc().unix_timestamp(),
             event_type: event_type.into(),

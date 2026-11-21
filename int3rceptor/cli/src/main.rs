@@ -1,5 +1,5 @@
 // ╔═══════════════════════════════════════════════════════════════════════════╗
-// ║                          INT3RCEPTOR v2.0.0                               ║
+// ║                                INT3RCEPTOR                                ║
 // ║                   Copyright (c) 2025 S1BGr0uP                             ║
 // ║                        All Rights Reserved                                ║
 // ╠═══════════════════════════════════════════════════════════════════════════╣
@@ -34,8 +34,11 @@ use tracing::info;
 
 // Build-time watermark - DO NOT REMOVE
 const BUILD_FINGERPRINT: &str = env!("BUILD_FINGERPRINT");
-const COPYRIGHT_NOTICE: &str =
-    "Int3rceptor v2.0.0 - Copyright (c) 2025 S1BGr0uP. All Rights Reserved.";
+const COPYRIGHT_NOTICE: &str = concat!(
+    "Int3rceptor v",
+    env!("CARGO_PKG_VERSION"),
+    " - Copyright (c) 2025 S1BGr0uP. All Rights Reserved."
+);
 const LICENSE_URL: &str = "https://github.com/S1b-Team/int3rceptor/blob/main/LICENSE";
 
 #[derive(Parser, Debug)]
@@ -60,7 +63,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Display copyright watermark
     println!("\n╔═══════════════════════════════════════════════════════════════════════════╗");
-    println!("║                          INT3RCEPTOR v2.0.0                               ║");
+    println!(
+        "║{:^75}║",
+        concat!("INT3RCEPTOR v", env!("CARGO_PKG_VERSION"))
+    );
     println!("║                   Copyright (c) 2025 S1BGr0uP                             ║");
     println!("║                        All Rights Reserved                                ║");
     println!("╠═══════════════════════════════════════════════════════════════════════════╣");

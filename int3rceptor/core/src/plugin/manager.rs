@@ -319,8 +319,10 @@ mod tests {
 
     #[test]
     fn test_list_plugins() {
-        let mut config = PluginSystemConfig::default();
-        config.enabled = false; // Don't actually load
+        let config = PluginSystemConfig {
+            enabled: false,
+            ..Default::default()
+        };
 
         let manager = PluginManager::new(config);
         let plugins = manager.list_plugins();

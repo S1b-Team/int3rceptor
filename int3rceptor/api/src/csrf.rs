@@ -130,11 +130,11 @@ pub async fn csrf_protection_middleware(
         .and_then(|v| v.to_str().ok())
         .and_then(|cookie_header| {
             // Parse cookie header for session cookie
-            cookie_header
-                .split(';')
-                .map(|s| s.trim())
-                .find(|s| s.starts_with("int3rceptor_session="))
-                .map(|s| s.strip_prefix("int3rceptor_session=").unwrap_or(""))
+            cookie_header.split(';').find_map(|s| {
+                s.trim()
+                    .strip_prefix(crate::session::SESSION_COOKIE_NAME)?
+                    .strip_prefix('=')
+            })
         })
         .unwrap_or("unknown");
 

@@ -122,7 +122,10 @@ impl WsCapture {
         // P4: Check per-connection frame limit
         let connection_frames = {
             let frames = self.frames.read();
-            frames.iter().filter(|f| f.connection_id == connection_id).count()
+            frames
+                .iter()
+                .filter(|f| f.connection_id == connection_id)
+                .count()
         };
 
         if connection_frames >= self.max_frames_per_connection {
@@ -163,7 +166,10 @@ impl WsCapture {
         }
 
         // P4: If per-connection limit exceeded, remove oldest frame from this connection
-        let connection_frame_count = frames.iter().filter(|f| f.connection_id == connection_id).count();
+        let connection_frame_count = frames
+            .iter()
+            .filter(|f| f.connection_id == connection_id)
+            .count();
         if connection_frame_count > self.max_frames_per_connection {
             if let Some(pos) = frames.iter().position(|f| f.connection_id == connection_id) {
                 frames.remove(pos);
@@ -209,7 +215,6 @@ impl WsCapture {
         self.frames.write().clear();
     }
 
-
     /// Aggregate stats matching the UI `WebSocketStats` contract.
     pub fn get_stats(&self) -> WsStats {
         // Lock order must match `capture_frame` (frames, then connections).
@@ -234,17 +239,13 @@ impl WsCapture {
             match frame.frame_type {
                 WsFrameType::Text => text_frames += 1,
                 WsFrameType::Binary => binary_frames += 1,
-                WsFrameType::Ping | WsFrameType::Pong | WsFrameType::Close => {
-                    control_frames += 1
-                }
+                WsFrameType::Ping | WsFrameType::Pong | WsFrameType::Close => control_frames += 1,
             }
         }
 
         // Include registered connections that have not produced frames yet.
         for conn in connections.iter() {
-            frames_by_connection
-                .entry(conn.id.clone())
-                .or_insert(0);
+            frames_by_connection.entry(conn.id.clone()).or_insert(0);
         }
 
         WsStats {
@@ -263,18 +264,23 @@ impl WsCapture {
     pub fn get_memory_stats(&self) -> WsMemoryStats {
         let frames = self.frames.read();
         let total_payload_bytes: usize = frames.iter().map(|f| f.payload.len()).sum();
-        
+
         let connections = self.connections.read();
         let mut per_connection_stats = Vec::new();
-        
+
         for conn in connections.iter() {
-            let conn_frames = frames.iter().filter(|f| f.connection_id == conn.id).collect::<Vec<_>>();
+            let conn_frames = frames
+                .iter()
+                .filter(|f| f.connection_id == conn.id)
+                .collect::<Vec<_>>();
             let conn_payload_bytes: usize = conn_frames.iter().map(|f| f.payload.len()).sum();
             per_connection_stats.push(ConnectionMemoryStats {
                 connection_id: conn.id.clone(),
                 frame_count: conn_frames.len(),
                 payload_bytes: conn_payload_bytes,
-                limit_percentage: (conn_frames.len() as f64 / self.max_frames_per_connection as f64) * 100.0,
+                limit_percentage: (conn_frames.len() as f64
+                    / self.max_frames_per_connection as f64)
+                    * 100.0,
             });
         }
 
@@ -300,7 +306,6 @@ impl Default for WsCapture {
         Self::new(10_000) // Default: 10k frames
     }
 }
-
 
 /// Aggregate WebSocket capture statistics (API / UI contract)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -387,13 +392,15 @@ mod tests {
 
         capture.register_connection("conn1".to_string(), "wss://example.com/ws".to_string());
 
-        let frame_id = capture.capture_frame(
-            "conn1".to_string(),
-            WsDirection::ClientToServer,
-            WsFrameType::Text,
-            b"Hello".to_vec(),
-            true,
-        ).expect("capture_frame should succeed");
+        let frame_id = capture
+            .capture_frame(
+                "conn1".to_string(),
+                WsDirection::ClientToServer,
+                WsFrameType::Text,
+                b"Hello".to_vec(),
+                true,
+            )
+            .expect("capture_frame should succeed");
 
         assert_eq!(frame_id, 1);
 
@@ -410,23 +417,27 @@ mod tests {
         // Fill up to limit
         for i in 0..10 {
             let payload = format!("frame{}", i).into_bytes();
-            capture.capture_frame(
-                "conn1".to_string(),
-                WsDirection::ClientToServer,
-                WsFrameType::Text,
-                payload,
-                true,
-            ).expect("capture_frame should succeed");
+            capture
+                .capture_frame(
+                    "conn1".to_string(),
+                    WsDirection::ClientToServer,
+                    WsFrameType::Text,
+                    payload,
+                    true,
+                )
+                .expect("capture_frame should succeed");
         }
 
         // At limit, next frame should still succeed (FIFO eviction)
-        capture.capture_frame(
-            "conn1".to_string(),
-            WsDirection::ClientToServer,
-            WsFrameType::Text,
-            b"overflow".to_vec(),
-            true,
-        ).expect("capture_frame should succeed with eviction");
+        capture
+            .capture_frame(
+                "conn1".to_string(),
+                WsDirection::ClientToServer,
+                WsFrameType::Text,
+                b"overflow".to_vec(),
+                true,
+            )
+            .expect("capture_frame should succeed with eviction");
 
         // Should still have 10 frames (oldest was removed)
         let frames = capture.get_frames("conn1");

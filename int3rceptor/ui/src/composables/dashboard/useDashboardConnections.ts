@@ -112,10 +112,27 @@ export function useDashboardConnections(): UseDashboardConnectionsReturn {
      * Computed: Milliseconds elapsed since last successful update
      * Returns 0 if never updated
      */
+    const now = ref(Date.now());
+    let clockInterval: ReturnType<typeof setInterval> | null = null;
+
     const timeSinceUpdate = computed((): number => {
         if (!lastUpdated.value) return 0;
-        return Date.now() - lastUpdated.value;
+        return Math.max(0, now.value - lastUpdated.value);
     });
+
+    const startClock = (): void => {
+        if (clockInterval !== null) return;
+        clockInterval = setInterval(() => {
+            now.value = Date.now();
+        }, 1000);
+    };
+
+    const stopClock = (): void => {
+        if (clockInterval !== null) {
+            clearInterval(clockInterval);
+            clockInterval = null;
+        }
+    };
 
     /**
      * Computed: Connection pool utilization percentage
@@ -188,6 +205,8 @@ export function useDashboardConnections(): UseDashboardConnectionsReturn {
                 connections.value = response.data.stats;
                 breakdown.value = response.data.breakdown || null;
                 lastUpdated.value = Date.now();
+                now.value = lastUpdated.value;
+                startClock();
                 retryCount = 0; // Reset retry counter on success
 
                 if (import.meta.env.DEV) {
@@ -323,6 +342,7 @@ export function useDashboardConnections(): UseDashboardConnectionsReturn {
      */
     onBeforeUnmount(() => {
         stopAutoFetch();
+        stopClock();
     });
 
     // ==========================================

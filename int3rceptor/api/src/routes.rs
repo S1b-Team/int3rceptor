@@ -1,7 +1,7 @@
 use crate::{
     models::{
-        ActivityQuery, AppSettings, DashboardActivity, HeaderPatch, ManualRequest, ManualResponse,
-        PluginInfo, PluginToggle, RepeatRequest,
+        ActivityQuery, AppSettings, HeaderPatch, ManualRequest, ManualResponse, PluginInfo,
+        PluginToggle, RepeatRequest,
     },
     state::AppState,
 };
@@ -476,7 +476,7 @@ fn build_export_response(entries: Vec<CaptureEntry>, format: ExportFormat) -> im
             let payload = json!({
                 "log": {
                     "version": "1.2",
-                    "creator": {"name": "Interceptor", "version": "0.1"},
+                    "creator": {"name": "INT3RCEPTOR", "version": env!("CARGO_PKG_VERSION")},
                     "entries": log_entries,
                 }
             });
@@ -1240,7 +1240,6 @@ mod proxy_route_tests {
         })
     }
 
-
     #[tokio::test]
     async fn websocket_stats_contract() {
         use interceptor_core::websocket::{WsDirection, WsFrameType};
@@ -1882,7 +1881,7 @@ mod proxy_route_tests {
             .expect("api connect");
         let req = format!(
             "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-            body.as_bytes().len()
+            body.len()
         );
         sock.write_all(req.as_bytes()).await.expect("api write");
         read_response(sock).await

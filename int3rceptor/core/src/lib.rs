@@ -9,12 +9,12 @@ pub mod error;
 pub mod integration;
 pub mod intercept;
 pub mod intruder;
-pub mod proxy_control;
 pub mod license;
 pub mod metrics;
 pub mod plugin;
 pub mod project;
 pub mod proxy;
+pub mod proxy_control;
 pub mod rules;
 pub mod scanner;
 pub mod scope;
@@ -35,10 +35,10 @@ pub use encoding::{
 pub use integration::{nowaru_bridge::NowaruBridge, voidwalker_bridge::VoidwalkerBridge};
 pub use intercept::{HeldRequest, InterceptDecision, InterceptQueue, InterceptStatus};
 pub use intruder::Intruder;
-pub use proxy_control::{ProxyController, ProxyStatus};
 pub use license::{License, LicenseManager, LicenseTier};
 pub use metrics::{metrics, Metrics, MetricsSnapshot};
 pub use project::{ProjectData, ProjectInfo, ProjectManager, ProjectSummary};
+pub use proxy_control::{ProxyController, ProxyStatus};
 pub use scanner::{
     DetectionRule, Finding, ScanConfig, ScanStats, Scanner, Severity, VulnerabilityCategory,
 };

@@ -207,6 +207,8 @@ impl DetectionRule {
 
     /// Get default security rules
     pub fn default_rules() -> Vec<DetectionRule> {
+        // `mut` is only needed by the `pro` block below, which extends the free rules.
+        #[cfg_attr(not(feature = "pro"), allow(unused_mut))]
         let mut rules: Vec<DetectionRule> =
             match serde_json::from_str(include_str!("free_rules.json")) {
                 Ok(rules) => rules,

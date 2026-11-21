@@ -5,8 +5,8 @@
 // ║  P5 Security: Plugin path validation and resource limits                 ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-use crate::error::Result;
 use crate::error::ProxyError;
+use crate::error::Result;
 use std::path::{Path, PathBuf};
 
 // P5 Security: Plugin resource limits
@@ -29,10 +29,7 @@ impl PluginSecurityValidator {
     /// Validate plugin path is within allowed directories (prevents path traversal)
     pub fn validate_plugin_path(&self, plugin_path: &Path) -> Result<()> {
         // Reject if path contains .. (path traversal attempt)
-        if plugin_path
-            .components()
-            .any(|c| c.as_os_str() == "..")
-        {
+        if plugin_path.components().any(|c| c.as_os_str() == "..") {
             return Err(ProxyError::internal(
                 "Plugin path contains '..': path traversal not allowed".to_string(),
             ));
@@ -50,9 +47,10 @@ impl PluginSecurityValidator {
         };
 
         // Check if canonical path is within an allowed directory
-        let is_allowed = self.allowed_dirs.iter().any(|allowed_dir| {
-            canonical.starts_with(allowed_dir)
-        });
+        let is_allowed = self
+            .allowed_dirs
+            .iter()
+            .any(|allowed_dir| canonical.starts_with(allowed_dir));
 
         if !is_allowed {
             return Err(ProxyError::internal(format!(
@@ -142,10 +140,10 @@ mod tests {
     fn test_valid_plugin_path() {
         let temp_dir = TempDir::new().unwrap();
         let plugin_file = temp_dir.path().join("plugin.wasm");
-        
+
         // Create a minimal WASM file (magic + version)
         let wasm_header = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
-        std::fs::write(&plugin_file, &wasm_header).unwrap();
+        std::fs::write(&plugin_file, wasm_header).unwrap();
 
         let validator = PluginSecurityValidator::new(vec![temp_dir.path().to_path_buf()]);
         let result = validator.validate_plugin_path(&plugin_file);
@@ -159,7 +157,7 @@ mod tests {
         let other_dir = TempDir::new().unwrap();
         let plugin_file = other_dir.path().join("plugin.wasm");
 
-        std::fs::write(&plugin_file, &[0x00, 0x61, 0x73, 0x6d]).unwrap();
+        std::fs::write(&plugin_file, [0x00, 0x61, 0x73, 0x6d]).unwrap();
 
         let validator = PluginSecurityValidator::new(vec![temp_dir.path().to_path_buf()]);
         let result = validator.validate_plugin_path(&plugin_file);
@@ -176,11 +174,11 @@ mod tests {
 
         // Valid WASM file
         let valid_wasm = temp_dir.path().join("valid.wasm");
-        std::fs::write(&valid_wasm, &[0x00, 0x61, 0x73, 0x6d]).unwrap();
+        std::fs::write(&valid_wasm, [0x00, 0x61, 0x73, 0x6d]).unwrap();
 
         // Invalid WASM file
         let invalid_wasm = temp_dir.path().join("invalid.wasm");
-        std::fs::write(&invalid_wasm, &[0xff, 0xff, 0xff, 0xff]).unwrap();
+        std::fs::write(&invalid_wasm, [0xff, 0xff, 0xff, 0xff]).unwrap();
 
         let validator = PluginSecurityValidator::new(vec![temp_dir.path().to_path_buf()]);
 

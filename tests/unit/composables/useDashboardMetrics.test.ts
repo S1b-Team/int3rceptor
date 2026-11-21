@@ -33,11 +33,12 @@ describe('useDashboardMetrics', () => {
   beforeEach(() => {
     mockApi = api as any;
     vi.clearAllMocks();
-    vi.clearAllTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   // ==========================================
@@ -237,8 +238,7 @@ describe('useDashboardMetrics', () => {
       await fetchMetrics();
 
       // Advance timers to allow retry
-      vi.advanceTimersByTime(1500); // Wait for first retry (1s + jitter)
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(1500); // Wait for first retry (1s + jitter)
 
       // Assert
       expect(mockApi.get).toHaveBeenCalledTimes(2); // Initial call + 1 retry
@@ -254,8 +254,7 @@ describe('useDashboardMetrics', () => {
 
       // Simulate 3 retries
       for (let i = 0; i < 3; i++) {
-        vi.advanceTimersByTime(5000); // Advance enough to trigger retry
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(5000); // Advance enough to trigger retry
       }
 
       // Assert
@@ -287,8 +286,7 @@ describe('useDashboardMetrics', () => {
 
       // First fetch with retry
       await fetchMetrics();
-      vi.advanceTimersByTime(1500);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(1500);
 
       // Second fetch (should succeed immediately)
       error.value = null;
@@ -327,8 +325,7 @@ describe('useDashboardMetrics', () => {
       startAutoFetch(1000); // 1 second interval
 
       // Advance 2.5 seconds
-      vi.advanceTimersByTime(2500);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(2500);
 
       // Assert - should have been called at least 2-3 times
       expect(mockApi.get.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -357,8 +354,7 @@ describe('useDashboardMetrics', () => {
       startAutoFetch(1000); // Try to start again
 
       // Advance 1.5 seconds
-      vi.advanceTimersByTime(1500);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(1500);
 
       // Assert - should only have expected calls, not doubled
       // First call immediate, then one after 1000ms
@@ -387,8 +383,7 @@ describe('useDashboardMetrics', () => {
       startAutoFetch(5000); // 5 second interval
 
       // Advance 6 seconds
-      vi.advanceTimersByTime(6000);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(6000);
 
       // Assert - should have ~2 calls (immediate + 1 after 5s)
       expect(mockApi.get.mock.calls.length).toBeGreaterThanOrEqual(1);
@@ -428,8 +423,7 @@ describe('useDashboardMetrics', () => {
       const callCountAfterStop = mockApi.get.mock.calls.length;
 
       // Advance more time
-      vi.advanceTimersByTime(2000);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(2000);
 
       const callCountAfterDelay = mockApi.get.mock.calls.length;
 
@@ -589,8 +583,7 @@ describe('useDashboardMetrics', () => {
       unmountCallback();
 
       // Try to advance more timers
-      vi.advanceTimersByTime(5000);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(5000);
 
       const callsAfterUnmount = mockApi.get.mock.calls.length;
 
@@ -681,13 +674,11 @@ describe('useDashboardMetrics', () => {
       expect(error.value).toBeTruthy();
 
       // Retry
-      vi.advanceTimersByTime(2000);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(2000);
       expect(error.value).toBeTruthy();
 
       // Retry again
-      vi.advanceTimersByTime(5000);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(5000);
 
       // Assert
       expect(error.value).toBeNull();

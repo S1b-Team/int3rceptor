@@ -14,7 +14,7 @@ const proxyConfig = ref({
   port: 8080,
   host: '127.0.0.1',
   interceptHttps: true,
-  http2: true
+  http2: true,
   enabled: true
 })
 

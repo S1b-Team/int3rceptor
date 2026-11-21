@@ -131,9 +131,10 @@ impl LicenseValidator {
     /// Validate a license key
     pub fn validate(&self, license_key: &str) -> Result<License> {
         use base64::{engine::general_purpose, Engine};
-        
+
         // Decode base64 license key
-        let decoded = general_purpose::STANDARD.decode(license_key)
+        let decoded = general_purpose::STANDARD
+            .decode(license_key)
             .map_err(|_| anyhow!(obfstr::obfstr!("Invalid license key format").to_string()))?;
 
         // Parse license data
@@ -179,15 +180,8 @@ impl LicenseValidator {
         }
 
         let (sig_bytes, license_data) = decoded.split_at(64);
-        let public_key_bytes = match self.public_key.as_bytes().try_into() {
-            Ok(b) => b,
-            Err(_) => return false,
-        };
-
-        match crypto::verify_ed25519_signature(public_key_bytes, license_data, sig_bytes) {
-            Ok(valid) => valid,
-            Err(_) => false,
-        }
+        crypto::verify_ed25519_signature(self.public_key.as_bytes(), license_data, sig_bytes)
+            .unwrap_or_default()
     }
 }
 

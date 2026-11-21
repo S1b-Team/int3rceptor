@@ -10,7 +10,6 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use anyhow::{anyhow, Result};
-use base64::{engine::general_purpose, Engine};
 use ed25519_dalek::{Signature, VerifyingKey};
 use rand::Rng;
 use sha2::{Digest, Sha256};
@@ -26,10 +25,6 @@ const ED25519_SIGNATURE_SIZE: usize = 64;
 
 /// AES-256-GCM nonce size (12 bytes)
 const GCM_NONCE_SIZE: usize = 12;
-
-/// AES-256-GCM tag size (16 bytes)
-const GCM_TAG_SIZE: usize = 16;
-
 /// Verifies an Ed25519 signature over data
 ///
 /// # Arguments
@@ -149,9 +144,17 @@ mod tests {
 
     #[test]
     fn test_ed25519_verification() {
-        // For now, skip this test as the ed25519-dalek API is complex
-        // The actual signature verification is tested in production usage
-        assert!(true);
+        use ed25519_dalek::{Signer, SigningKey};
+
+        // codeql[rust/hard-coded-cryptographic-value]: Test-only key, not used in production
+        let signing_key = SigningKey::from_bytes(&[7u8; 32]);
+        let public_key = signing_key.verifying_key().to_bytes();
+        let data = b"license payload";
+        let signature = signing_key.sign(data).to_bytes();
+
+        assert!(verify_ed25519_signature(&public_key, data, &signature).unwrap());
+        assert!(!verify_ed25519_signature(&public_key, b"tampered payload", &signature).unwrap());
+        assert!(verify_ed25519_signature(&public_key[..31], data, &signature).is_err());
     }
 
     #[test]
