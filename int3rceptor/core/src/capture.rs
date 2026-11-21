@@ -191,7 +191,13 @@ impl RequestCapture {
 
     // Activity log methods
 
-    pub fn log_activity(&self, event_type: impl Into<String>, message: impl Into<String>, level: impl Into<String>, details: Option<serde_json::Value>) {
+    pub fn log_activity(
+        &self,
+        event_type: impl Into<String>,
+        message: impl Into<String>,
+        level: impl Into<String>,
+        details: Option<serde_json::Value>,
+    ) {
         let activity = DashboardActivity {
             timestamp: OffsetDateTime::now_utc().unix_timestamp(),
             event_type: event_type.into(),

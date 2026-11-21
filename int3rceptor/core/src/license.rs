@@ -131,9 +131,10 @@ impl LicenseValidator {
     /// Validate a license key
     pub fn validate(&self, license_key: &str) -> Result<License> {
         use base64::{engine::general_purpose, Engine};
-        
+
         // Decode base64 license key
-        let decoded = general_purpose::STANDARD.decode(license_key)
+        let decoded = general_purpose::STANDARD
+            .decode(license_key)
             .map_err(|_| anyhow!(obfstr::obfstr!("Invalid license key format").to_string()))?;
 
         // Parse license data

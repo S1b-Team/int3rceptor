@@ -5,8 +5,8 @@
 // ║  P5 Security: Plugin path validation and resource limits                 ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-use crate::error::Result;
 use crate::error::ProxyError;
+use crate::error::Result;
 use std::path::{Path, PathBuf};
 
 // P5 Security: Plugin resource limits
@@ -29,10 +29,7 @@ impl PluginSecurityValidator {
     /// Validate plugin path is within allowed directories (prevents path traversal)
     pub fn validate_plugin_path(&self, plugin_path: &Path) -> Result<()> {
         // Reject if path contains .. (path traversal attempt)
-        if plugin_path
-            .components()
-            .any(|c| c.as_os_str() == "..")
-        {
+        if plugin_path.components().any(|c| c.as_os_str() == "..") {
             return Err(ProxyError::internal(
                 "Plugin path contains '..': path traversal not allowed".to_string(),
             ));
@@ -50,9 +47,10 @@ impl PluginSecurityValidator {
         };
 
         // Check if canonical path is within an allowed directory
-        let is_allowed = self.allowed_dirs.iter().any(|allowed_dir| {
-            canonical.starts_with(allowed_dir)
-        });
+        let is_allowed = self
+            .allowed_dirs
+            .iter()
+            .any(|allowed_dir| canonical.starts_with(allowed_dir));
 
         if !is_allowed {
             return Err(ProxyError::internal(format!(
@@ -142,7 +140,7 @@ mod tests {
     fn test_valid_plugin_path() {
         let temp_dir = TempDir::new().unwrap();
         let plugin_file = temp_dir.path().join("plugin.wasm");
-        
+
         // Create a minimal WASM file (magic + version)
         let wasm_header = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
         std::fs::write(&plugin_file, &wasm_header).unwrap();

@@ -1240,7 +1240,6 @@ mod proxy_route_tests {
         })
     }
 
-
     #[tokio::test]
     async fn websocket_stats_contract() {
         use interceptor_core::websocket::{WsDirection, WsFrameType};

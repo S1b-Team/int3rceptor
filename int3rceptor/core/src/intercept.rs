@@ -98,10 +98,7 @@ impl InterceptQueue {
     }
 
     pub fn get(&self, id: u64) -> Option<HeldRequest> {
-        self.inner
-            .pending
-            .get(&id)
-            .map(|entry| entry.held.clone())
+        self.inner.pending.get(&id).map(|entry| entry.held.clone())
     }
 
     /// Apply a decision to a held request. Returns false if the id is unknown
@@ -217,7 +214,9 @@ mod tests {
     async fn disabled_queue_forwards_immediately() {
         let queue = InterceptQueue::new();
         assert!(!queue.is_enabled());
-        let decision = queue.hold(sample_request("GET", "http://example.com/")).await;
+        let decision = queue
+            .hold(sample_request("GET", "http://example.com/"))
+            .await;
         assert!(matches!(decision, InterceptDecision::Forward));
         assert!(queue.is_empty());
     }
@@ -229,7 +228,11 @@ mod tests {
 
         let hold = tokio::spawn({
             let queue = queue.clone();
-            async move { queue.hold(sample_request("POST", "http://example.com/api")).await }
+            async move {
+                queue
+                    .hold(sample_request("POST", "http://example.com/api"))
+                    .await
+            }
         });
 
         timeout(Duration::from_secs(1), async {
@@ -260,7 +263,11 @@ mod tests {
 
         let hold = tokio::spawn({
             let queue = queue.clone();
-            async move { queue.hold(sample_request("GET", "http://example.com/drop")).await }
+            async move {
+                queue
+                    .hold(sample_request("GET", "http://example.com/drop"))
+                    .await
+            }
         });
 
         timeout(Duration::from_secs(1), async {
@@ -287,7 +294,11 @@ mod tests {
 
         let hold = tokio::spawn({
             let queue = queue.clone();
-            async move { queue.hold(sample_request("GET", "http://example.com/edit")).await }
+            async move {
+                queue
+                    .hold(sample_request("GET", "http://example.com/edit"))
+                    .await
+            }
         });
 
         timeout(Duration::from_secs(1), async {
@@ -333,7 +344,11 @@ mod tests {
 
         let hold = tokio::spawn({
             let queue = queue.clone();
-            async move { queue.hold(sample_request("GET", "http://example.com/flush")).await }
+            async move {
+                queue
+                    .hold(sample_request("GET", "http://example.com/flush"))
+                    .await
+            }
         });
 
         timeout(Duration::from_secs(1), async {
