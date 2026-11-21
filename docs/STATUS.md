@@ -27,4 +27,4 @@ This is the single living status document. Reports under `docs/archive/` are his
 
 ## Version
 
-All crates and the desktop app use `3.0.0`. Bump them together.
+Core, API, CLI and the desktop app use `3.0.0`. Bump them together. `examples/simple-plugin` is a sample and keeps its own version.
