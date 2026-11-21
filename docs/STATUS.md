@@ -19,7 +19,7 @@ This is the single living status document. Reports under `docs/archive/` are his
 ## Known gaps today
 
 - `desktop/` does not build (157 TypeScript errors, one invalid attribute in `IntruderView.vue`).
-- `/api/dashboard/metrics` and `/api/stats` do not exist; the UIs call them.
+- `desktop/` calls `/api/stats`, which does not exist. Use `/api/dashboard/metrics` (added in F1).
 - API auth is off unless `INTERCEPTOR_API_TOKEN` is set, and CORS is permissive.
 - No HAR import. Loading a project drops scope excludes.
 - Tauri does not start the proxy. No updater, signing or CSP.
