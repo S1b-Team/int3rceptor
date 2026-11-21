@@ -3,9 +3,9 @@
 
 [package]
 name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "3.0.0"
+description = "INT3RCEPTOR desktop app"
+authors = ["S1BGr0uP"]
 license = ""
 repository = ""
 edition = "2021"
