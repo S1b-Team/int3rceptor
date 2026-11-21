@@ -910,6 +910,9 @@ async fn comparer_diff(Json(req): Json<CompareRequest>) -> impl IntoResponse {
 struct ProjectSaveRequest {
     path: String,
     scope: Vec<String>,
+    /// Defaults to the exclusions currently active on the server.
+    #[serde(default)]
+    excludes: Option<Vec<String>>,
 }
 
 #[derive(Deserialize)]
@@ -933,7 +936,10 @@ async fn project_save(
     Json(req): Json<ProjectSaveRequest>,
 ) -> impl IntoResponse {
     let settings = serde_json::to_value(&*state.settings.read().await).unwrap_or_default();
-    match state.project_manager.export(req.scope, settings) {
+    let excludes = req
+        .excludes
+        .unwrap_or_else(|| state.scope.get_config().excludes);
+    match state.project_manager.export(req.scope, excludes, settings) {
         Ok(data) => match data.save_to_file(&req.path) {
             Ok(_) => StatusCode::OK.into_response(),
             Err(e) => (
@@ -961,7 +967,7 @@ async fn project_load(
                 .scope
                 .set_config(interceptor_core::scope::ScopeConfig {
                     includes: data.scope.clone(),
-                    excludes: vec![], // TODO: Save excludes in project data
+                    excludes: data.excludes.clone(),
                 });
 
             // Restore settings
@@ -1244,6 +1250,58 @@ mod proxy_route_tests {
             proxy,
             intercept,
         })
+    }
+
+    async fn post_status(state: Arc<AppState>, uri: &str, body: serde_json::Value) -> StatusCode {
+        router()
+            .layer(Extension(state))
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(uri)
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+    }
+
+    #[tokio::test]
+    async fn project_save_and_load_keep_scope_excludes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p.i3p").to_string_lossy().into_owned();
+
+        let state = test_state().await;
+        state
+            .scope
+            .set_config(interceptor_core::scope::ScopeConfig {
+                includes: vec!["example.com".into()],
+                excludes: vec!["logout".into()],
+            });
+        let saved = post_status(
+            state.clone(),
+            "/api/project/save",
+            serde_json::json!({ "path": path, "scope": ["example.com"] }),
+        )
+        .await;
+        assert_eq!(saved, StatusCode::OK);
+
+        state
+            .scope
+            .set_config(interceptor_core::scope::ScopeConfig::default());
+        let loaded = post_status(
+            state.clone(),
+            "/api/project/load",
+            serde_json::json!({ "path": path }),
+        )
+        .await;
+        assert_eq!(loaded, StatusCode::OK);
+
+        let scope = state.scope.get_config();
+        assert_eq!(scope.includes, vec!["example.com".to_string()]);
+        assert_eq!(scope.excludes, vec!["logout".to_string()]);
     }
 
     #[tokio::test]

@@ -35,6 +35,9 @@ pub struct ProjectData {
     pub info: ProjectInfo,
     pub traffic: Vec<CaptureEntry>,
     pub scope: Vec<String>,
+    /// Scope exclusions. Absent in projects saved before 3.0.
+    #[serde(default)]
+    pub excludes: Vec<String>,
     pub settings: serde_json::Value,
 }
 
@@ -48,6 +51,7 @@ impl ProjectData {
             info,
             traffic: Vec::new(),
             scope: Vec::new(),
+            excludes: Vec::new(),
             settings: serde_json::json!({}),
         }
     }
@@ -141,7 +145,12 @@ impl ProjectManager {
     }
 
     /// Export current project data
-    pub fn export(&self, scope: Vec<String>, settings: serde_json::Value) -> Result<ProjectData> {
+    pub fn export(
+        &self,
+        scope: Vec<String>,
+        excludes: Vec<String>,
+        settings: serde_json::Value,
+    ) -> Result<ProjectData> {
         let info = self.current_info();
 
         // Get all traffic from storage
@@ -155,6 +164,7 @@ impl ProjectManager {
             info,
             traffic,
             scope,
+            excludes,
             settings,
         })
     }
@@ -219,6 +229,28 @@ mod tests {
         assert_eq!(loaded.info.name, "Test Project");
         assert_eq!(loaded.info.description, "A test project");
         assert_eq!(loaded.scope.len(), 2);
+    }
+
+    #[test]
+    fn excludes_round_trip_and_default_to_empty_for_old_projects() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("excludes.i3p");
+        let mut project = ProjectData::new("Excludes");
+        project.excludes = vec!["logout".to_string()];
+        project.save_to_file(&path).unwrap();
+        let loaded = ProjectData::load_from_file(&path).unwrap();
+        assert_eq!(loaded.excludes, vec!["logout".to_string()]);
+
+        let old = dir.path().join("old.i3p");
+        std::fs::write(
+            &old,
+            r#"{"info":{"name":"Old","description":"","created_at":0,"modified_at":0,"version":"1.0"},
+                "traffic":[],"scope":["example.com"],"settings":{}}"#,
+        )
+        .unwrap();
+        let loaded = ProjectData::load_from_file(&old).unwrap();
+        assert_eq!(loaded.scope, vec!["example.com".to_string()]);
+        assert!(loaded.excludes.is_empty());
     }
 
     #[test]
