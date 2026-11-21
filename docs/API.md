@@ -17,6 +17,14 @@ Local access is the normal case. When configured, the API stack can apply:
 
 Remote exposure without those controls is not the intended deployment.
 
+### Token
+
+Send the token as `Authorization: Bearer <token>` or `x-api-key: <token>`. `interceptor-api` requires `INTERCEPTOR_API_TOKEN` unless `INTERCEPTOR_DEV_MODE=1`. The `interceptor` CLI only serves without a token on a loopback address.
+
+### CORS
+
+Only the desktop shell (`tauri://localhost`, `http(s)://tauri.localhost`) and the Vite dev server (`http://localhost:5173`, `http://127.0.0.1:5173`) are allowed by default. Set `INTERCEPTOR_CORS_ORIGINS` to a comma-separated list to replace that list. The single value `*` allows any origin and is an explicit opt-in.
+
 ## Live updates
 
 | Method | Path | Notes |
