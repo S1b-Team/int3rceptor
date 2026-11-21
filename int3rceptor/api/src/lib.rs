@@ -1,6 +1,7 @@
 pub mod audit;
 pub mod auth;
 pub mod csrf;
+pub mod dashboard_metrics;
 pub mod error;
 pub mod ip_filter;
 pub mod models;
