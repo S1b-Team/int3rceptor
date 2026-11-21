@@ -476,7 +476,7 @@ fn build_export_response(entries: Vec<CaptureEntry>, format: ExportFormat) -> im
             let payload = json!({
                 "log": {
                     "version": "1.2",
-                    "creator": {"name": "Interceptor", "version": "0.1"},
+                    "creator": {"name": "INT3RCEPTOR", "version": env!("CARGO_PKG_VERSION")},
                     "entries": log_entries,
                 }
             });

@@ -1545,7 +1545,7 @@ dependencies = [
 
 [[package]]
 name = "interceptor"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1560,7 +1560,7 @@ dependencies = [
 
 [[package]]
 name = "interceptor-api"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1593,7 +1593,7 @@ dependencies = [
 
 [[package]]
 name = "interceptor-core"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "aes-gcm",
  "anyhow",

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "INT3RCEPTOR",
-  "version": "3.0.0-beta",
+  "version": "3.0.0",
   "identifier": "com.s1bgroup.int3rceptor",
   "build": {
     "frontendDist": "../dist",
