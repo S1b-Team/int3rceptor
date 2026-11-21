@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod auth;
+pub mod cors;
 pub mod csrf;
 pub mod dashboard_metrics;
 pub mod error;
@@ -19,7 +20,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower::limit::ConcurrencyLimitLayer;
-use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer};
+use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
 
 pub fn build_router(state: Arc<AppState>) -> Router {
@@ -54,8 +55,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .layer(middleware::from_fn_with_state(state.clone(), require_auth))
         // Rate limiting (needs ConnectInfo)
         .layer(middleware::from_fn(rate_limit))
-        // CORS
-        .layer(CorsLayer::permissive())
+        // CORS (allowlist; see `cors` module)
+        .layer(cors::layer(&cors::origins_from_env()))
         // Security headers (outermost, runs on response)
         .layer(middleware::from_fn(security_headers_middleware))
         // Tower layers

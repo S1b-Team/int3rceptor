@@ -9,7 +9,7 @@ This is the single living status document. Reports under `docs/archive/` are his
 | Phase | Goal | Status |
 |-------|------|--------|
 | F0 | CI at the repo root, honest docs, one version, public-core sync | In progress |
-| F1 | Backend gaps: dashboard metrics, secure-by-default API, HAR import, scope excludes | Pending |
+| F1 | Backend gaps: dashboard metrics, secure-by-default API, HAR import, scope excludes | Done, except upstream proxy support (deferred to v1.1) |
 | F2 | `desktop/` replaces `ui/` (stores, single API client, router) | Pending |
 | F3 | Design system and screen parity with `docs/mockups` | Pending |
 | F4 | Tauri: proxy sidecar, CA onboarding, CSP, updater, signing, releases | Pending |
@@ -20,8 +20,10 @@ This is the single living status document. Reports under `docs/archive/` are his
 
 - `desktop/` does not build (157 TypeScript errors, one invalid attribute in `IntruderView.vue`).
 - `desktop/` calls `/api/stats`, which does not exist. Use `/api/dashboard/metrics` (added in F1).
-- API auth is off unless `INTERCEPTOR_API_TOKEN` is set, and CORS is permissive.
-- No HAR import. Loading a project drops scope excludes.
+- `interceptor-api` requires `INTERCEPTOR_API_TOKEN` (or `INTERCEPTOR_DEV_MODE=1`). The `interceptor` CLI serves the API without a token only on loopback; on any other address it refuses unless `INTERCEPTOR_DEV_MODE=1`.
+- `/api/health` also requires the token. The Tauri sidecar must send it (decide in F4 whether to open this one route).
+- The WebSocket endpoint `/ws` is not covered by the CORS allowlist (browsers do not enforce CORS on WebSockets); an `Origin` check is still to do.
+- No upstream proxy support (deferred to v1.1).
 - Tauri does not start the proxy. No updater, signing or CSP.
 - The license is not enforced, and the public build embeds a placeholder key.
 

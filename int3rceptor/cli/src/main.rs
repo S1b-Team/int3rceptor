@@ -123,7 +123,14 @@ async fn main() -> anyhow::Result<()> {
     let ws_capture = Arc::new(WsCapture::new(10_000));
     info!("Initialized WebSocket Capture");
     let tls = Arc::new(TlsInterceptor::new(cert_manager.clone())?);
-    let api_token = std::env::var("INTERCEPTOR_API_TOKEN").ok().map(Arc::new);
+    let api_token = std::env::var("INTERCEPTOR_API_TOKEN")
+        .ok()
+        .filter(|token| !token.is_empty())
+        .map(Arc::new);
+    let dev_mode = std::env::var("INTERCEPTOR_DEV_MODE")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    check_api_exposure(api_token.is_some(), &cli.api, dev_mode).map_err(|e| anyhow::anyhow!(e))?;
     let max_body_bytes = std::env::var("INTERCEPTOR_MAX_BODY_BYTES")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -247,4 +254,56 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Shutdown complete");
     Ok(())
+}
+
+/// Refuses to expose an unauthenticated API beyond the loopback interface.
+fn check_api_exposure(
+    has_token: bool,
+    addr: &std::net::SocketAddr,
+    dev_mode: bool,
+) -> Result<(), String> {
+    if has_token {
+        return Ok(());
+    }
+    if addr.ip().is_loopback() {
+        tracing::warn!(
+            "INTERCEPTOR_API_TOKEN is not set: the API on {addr} accepts requests without authentication"
+        );
+        return Ok(());
+    }
+    if dev_mode {
+        tracing::warn!("DEV MODE: serving the API on {addr} without authentication");
+        return Ok(());
+    }
+    Err(format!(
+        "refusing to serve the API on {addr} without INTERCEPTOR_API_TOKEN \
+         (set a token, bind to 127.0.0.1, or set INTERCEPTOR_DEV_MODE=1)"
+    ))
+}
+
+#[cfg(test)]
+mod exposure_tests {
+    use super::check_api_exposure;
+
+    fn addr(s: &str) -> std::net::SocketAddr {
+        s.parse().unwrap()
+    }
+
+    #[test]
+    fn a_token_always_allows_serving() {
+        assert!(check_api_exposure(true, &addr("0.0.0.0:3000"), false).is_ok());
+    }
+
+    #[test]
+    fn loopback_without_a_token_is_allowed() {
+        assert!(check_api_exposure(false, &addr("127.0.0.1:3000"), false).is_ok());
+        assert!(check_api_exposure(false, &addr("[::1]:3000"), false).is_ok());
+    }
+
+    #[test]
+    fn exposed_without_a_token_is_refused_unless_dev_mode() {
+        assert!(check_api_exposure(false, &addr("0.0.0.0:3000"), false).is_err());
+        assert!(check_api_exposure(false, &addr("192.168.1.5:3000"), false).is_err());
+        assert!(check_api_exposure(false, &addr("0.0.0.0:3000"), true).is_ok());
+    }
 }
